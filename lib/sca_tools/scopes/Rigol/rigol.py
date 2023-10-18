@@ -1,0 +1,3 @@
+
+def RigolOscilloscope():
+    pass

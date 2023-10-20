@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from enum import Enum
+import time
 
 class TriggerMode(Enum):
     EDGE_RASE = 0
@@ -15,7 +16,7 @@ class ScopeBase(metaclass=ABCMeta):
         """
         self.resource = resource
         self.timeout = timeout
-        self.resource.timeout = self.timeout
+        self.resource.timeout = 3000 # 3s
 
     # destractor
     def __del__(self):
@@ -68,17 +69,42 @@ class ScopeBase(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def config_trace_channel(self, channel, scale, offset, period, impedance = None):
+    def config_trace_channel(self, channel, scale, offset, period, delay = 0, **kwargs):
         """
             channel: channel number
             scale: vertical scale in V
             offset: vertical offset in V
             period: time period in s
-            impedance: impedance in ohm
+            delay: delay time to acquisition after trigger in s
+            **kwargs: oscilloscope dependent parameters
         """
         pass
 
     @abstractmethod
-    def capture(self, target):
+    def is_triggered(self):
+        """
+            Return whether the oscilloscope is triggered or not
+        """
         pass
 
+    # ChipWhisperer compatible interface
+    @abstractmethod
+    def arm(self):
+        """Setup scope for triggering"""
+        pass
+
+    def capture(self, **kwargs) -> bool:
+        time.sleep(0.2)
+        # wait untill the scope is triggered
+        start = time.time()
+        while not self.is_triggered():
+            if time.time() - start > self.timeout:
+                return True
+            time.sleep(0.5)
+        return False
+
+
+    @abstractmethod
+    def get_last_trace(self, as_int):
+        """Return the captured waveform"""
+        pass

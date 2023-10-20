@@ -10,10 +10,10 @@ scope_creator = {
     "Rigol Technologies": RigolOscilloscope,
 }
 
-def Oscilloscope(visaAddr, timeout=3000) -> ScopeBase:
+def Oscilloscope(visaAddr, timeout=10) -> ScopeBase:
     """Create an oscilloscope object from the given VISA address.
         visaAddr: VISA address of the oscilloscope
-        timeout: timeout in ms
+        timeout: timeout in s
     """
     rm = pyvisa.ResourceManager()
     inst = rm.open_resource(visaAddr)

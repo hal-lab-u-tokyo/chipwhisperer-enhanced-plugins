@@ -1,7 +1,12 @@
 from chipwhisperer.capture.targets._base import TargetTemplate
 from Crypto.Cipher import AES
 
-import ftd2xx
+try:
+    import ftd2xx
+    ftd2xx_available = True
+except OSError:
+    ftd2xx_available = False
+
 import time
 
 DEVICE_NAME = "FT8P1RTUA"
@@ -11,7 +16,7 @@ class SakuraXControl:
     PLAINTEXT_ADDR = 0x140
     CIPHERTEXT_ADDR = 0x180
     KICK_ADDR = 0x2
-    def __init__(self, dev : ftd2xx.FTD2XX) -> None:
+    def __init__(self, dev) -> None:
         self.dev = dev
         self.dev.setBaudRate(115200)
         self.dev.setTimeouts(1000, 1000)
@@ -73,6 +78,8 @@ class SakuraX(TargetTemplate):
     _name = 'Sakura-X'
     def __init__(self):
         super().__init__()
+        if not ftd2xx_available:
+            raise RuntimeError("ftd2xx is not available")
         self.connectStatus = False
         self.ctrl = None
         self.scope = None

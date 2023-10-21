@@ -7,7 +7,7 @@ from .base import ScopeBase
 # factory method for each vendor
 scope_creator = {
     "AGILENT TECHNOLOGIES": KeysightOscilloscope,
-    "Rigol Technologies": RigolOscilloscope,
+    "RIGOL TECHNOLOGIES": RigolOscilloscope,
 }
 
 def Oscilloscope(visaAddr, timeout=10) -> ScopeBase:

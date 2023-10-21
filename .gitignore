@@ -49,3 +49,4 @@ package.nls.*.json
 l10n/
 
 venv*
+*.cwp

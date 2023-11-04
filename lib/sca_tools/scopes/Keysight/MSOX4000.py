@@ -124,8 +124,11 @@ class MSOX4000(ScopeBase):
         if as_int:
             return wavedata
         else:
-            y_increment = float(self.query(':WAVEFORM:YINCREMENT?'))
-            y_origin = float(self.query(':WAVEFORM:YORIGIN?'))
-            y_reference = int(self.query(':WAVEFORM:YREFERENCE?'))
+            try:
+                y_increment = float(self.query(':WAVEFORM:YINCREMENT?'))
+                y_origin = float(self.query(':WAVEFORM:YORIGIN?'))
+                y_reference = int(self.query(':WAVEFORM:YREFERENCE?'))
+            except ValueError:
+                return None
 
             return ((wavedata) * y_increment) + y_origin - y_increment * y_reference

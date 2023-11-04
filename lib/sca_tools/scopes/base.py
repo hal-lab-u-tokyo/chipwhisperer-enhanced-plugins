@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 import time
+from pyvisa import VisaIOError
 
 class TriggerMode(Enum):
     EDGE_RASE = 0
@@ -12,6 +13,7 @@ class ScopeBase(metaclass=ABCMeta):
     def __init__(self, resource, timeout):
         """
             resource: pyvisa resource
+            wait_time: wait time after arming
             timeout: timeout in ms
         """
         self.resource = resource
@@ -23,10 +25,24 @@ class ScopeBase(metaclass=ABCMeta):
         self.resource.close()
 
     def write(self, cmd):
-        self.resource.write(cmd)
+        try:
+            self.resource.write(cmd)
+        except VisaIOError:
+            return False
+        return True
 
-    def query(self, cmd):
-        return self.resource.query(cmd)
+    def query(self, cmd, default = ""):
+        """
+            wrapper for pyvisa query
+
+            Args:
+                cmd: command to send
+                default: default value to return if the command fails
+        """
+        try:
+            return self.resource.query(cmd)
+        except VisaIOError:
+            return default
 
     @abstractmethod
     def get_num_channels(self):

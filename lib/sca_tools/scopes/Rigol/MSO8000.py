@@ -157,8 +157,7 @@ class MSO8000(ScopeBase):
 
     def arm(self):
         self.write(":SINGLE")
-        time.sleep(0.7)
-
+        time.sleep(0.8)
 
     def get_last_trace(self, as_int):
         # read waveform
@@ -173,8 +172,11 @@ class MSO8000(ScopeBase):
         if as_int:
             return waveform_data
         else:
-            y_increment = float(self.query(':WAVEFORM:YINCREMENT?'))
-            y_origin = float(self.query(':WAVEFORM:YORIGIN?'))
-            y_reference = int(self.query(':WAVEFORM:YREFERENCE?'))
+            try:
+                y_increment = float(self.query(':WAVEFORM:YINCREMENT?'))
+                y_origin = float(self.query(':WAVEFORM:YORIGIN?'))
+                y_reference = int(self.query(':WAVEFORM:YREFERENCE?'))
+            except ValueError:
+                return None
 
             return ((waveform_data) * y_increment) + y_origin - y_increment * y_reference

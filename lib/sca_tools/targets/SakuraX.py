@@ -1,5 +1,6 @@
 from chipwhisperer.capture.targets._base import TargetTemplate
 from Crypto.Cipher import AES
+import numpy as np
 
 try:
     import ftd2xx
@@ -72,7 +73,6 @@ class SakuraXControl:
         for i in range(byte_len // 2):
             ct += self.read_data(self.CIPHERTEXT_ADDR + 2 * i)
         return ct
-    
 
 class SakuraX(TargetTemplate):
     _name = 'Sakura-X'
@@ -114,7 +114,8 @@ class SakuraX(TargetTemplate):
         self.ctrl.flush()
 
     def readOutput(self):
-        return self.ctrl.read_ciphertext(len(self.last_key))
+        return np.frombuffer(self.ctrl.read_ciphertext(len(self.last_key)),\
+                            dtype=np.uint8)
 
     def go(self):
         self.ctrl.run()

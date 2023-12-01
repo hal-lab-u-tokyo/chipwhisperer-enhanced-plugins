@@ -2,6 +2,7 @@
 from sca_tools.scopes.base import ScopeBase,TriggerMode
 import time
 import numpy as np
+from pyvisa import VisaIOError
 
 class MSO8000(ScopeBase):
     """
@@ -166,7 +167,11 @@ class MSO8000(ScopeBase):
         self.write(f':WAVEFORM:START {self.start_pos}')
         stop_pos = self.start_pos + self.sample_count
         self.write(f':WAVEFORM:STOP {stop_pos}')
-        raw_data = self.resource.query_binary_values(':WAVEFORM:DATA?', datatype='B', container=np.array)
+        try:
+            raw_data = self.resource.query_binary_values(':WAVEFORM:DATA?', datatype='B', container=np.array)
+        except VisaIOError:
+            return []
+        
         waveform_data = np.append(waveform_data, raw_data)
 
         if as_int:
@@ -177,6 +182,6 @@ class MSO8000(ScopeBase):
                 y_origin = float(self.query(':WAVEFORM:YORIGIN?'))
                 y_reference = int(self.query(':WAVEFORM:YREFERENCE?'))
             except ValueError:
-                return None
+                return []
 
             return ((waveform_data) * y_increment) + y_origin - y_increment * y_reference

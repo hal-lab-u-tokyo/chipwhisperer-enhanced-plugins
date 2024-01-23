@@ -51,3 +51,7 @@ l10n/
 venv*
 *.cwp
 .vscode
+*.npy
+*.egg-info
+*.so
+*.ipynb_checkpoints

@@ -22,8 +22,8 @@ class FastCPAProgressive(AlgorithmsBase):
         self.updateScript()
 
     def getCpaKernel(self, byte_len, numpoints, model):
-        from . import cpa_kernel
-        return cpa_kernel.FastCPA(byte_len, numpoints, model)
+        from .cpa_kernel import FastCPA
+        return FastCPA(byte_len, numpoints, model)
 
     def addTraces(self, traceSource, tracerange, progressBar=None, pointRange=None):
         numtraces = tracerange[1] - tracerange[0]
@@ -71,5 +71,5 @@ class FastCPAProgressive(AlgorithmsBase):
 
 class FastCPAProgressiveCuda(FastCPAProgressive):
     def getCpaKernel(self, byte_len, numpoints, model):
-        from . import cpa_cuda_kernel
-        return cpa_cuda_kernel.FastCPACuda(byte_len, numpoints, model)
+        from .cpa_cuda_kernel import FastCPACuda
+        return FastCPACuda(byte_len, numpoints, model)

@@ -50,3 +50,4 @@ l10n/
 
 venv*
 *.cwp
+.vscode

@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:31
-*    Last Modified: 23-01-2024 16:57:32
+*    Last Modified: 24-01-2024 18:13:10
 */
 
 #include <pybind11/pybind11.h>
@@ -66,10 +66,10 @@ void FastCPACuda::setup_arrays(py::array_t<double> &py_traces,
 	if (device_hypothetial_leakage == nullptr) {
 		CUDA_CHECK(cudaMalloc((void**)&device_hypothetial_leakage,
 						hypothetial_leakage->get_size()));
-		CUDA_CHECK(cudaMemcpy(device_hypothetial_leakage,
-								hypothetial_leakage->get_pointer(),
-								hypothetial_leakage->get_size(),
-								cudaMemcpyHostToDevice));
+		// CUDA_CHECK(cudaMemcpy(device_hypothetial_leakage,
+		// 						hypothetial_leakage->get_pointer(),
+		// 						hypothetial_leakage->get_size(),
+		// 						cudaMemcpyHostToDevice));
 	}
 	if (device_sum_hypothesis_trace == nullptr) {
 		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_trace,

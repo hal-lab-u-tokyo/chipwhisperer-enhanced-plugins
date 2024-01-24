@@ -73,3 +73,8 @@ class FastCPAProgressiveCuda(FastCPAProgressive):
     def getCpaKernel(self, byte_len, numpoints, model):
         from .cpa_cuda_kernel import FastCPACuda
         return FastCPACuda(byte_len, numpoints, model)
+
+class FastCPAProgressiveOpenCL(FastCPAProgressive):
+    def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_opencl_kernel import FastCPAOpenCL
+        return FastCPAOpenCL(byte_len, numpoints, model)

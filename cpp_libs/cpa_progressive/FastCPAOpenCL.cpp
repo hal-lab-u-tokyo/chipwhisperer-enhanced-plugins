@@ -321,10 +321,6 @@ void FastCPAOpenCL::calculate_correlation_subkey(Array3D<double>* diff, long dou
 					sum_hypothesis_trace->get_size());
 	clFinish(command_queue);
 
-	for (int i = 0; i < 10; i++) {
-		printf("%f\n", sum_hypothesis_trace->at(0, 0, i));
-	}
-
 	#ifdef _OPENMP
 	#pragma omp parallel for collapse(2)
 	#endif

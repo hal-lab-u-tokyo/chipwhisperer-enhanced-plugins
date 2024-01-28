@@ -78,3 +78,8 @@ class FastCPAProgressiveOpenCL(FastCPAProgressive):
     def getCpaKernel(self, byte_len, numpoints, model):
         from .cpa_opencl_kernel import FastCPAOpenCL
         return FastCPAOpenCL(byte_len, numpoints, model)
+
+class FastCPAProgressiveOpenCLFP32(FastCPAProgressive):
+    def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_opencl_kernel import FastCPAOpenCLFP32
+        return FastCPAOpenCLFP32(byte_len, numpoints, model)

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages, Extension
 import subprocess
 import os
 
-import_name = "sca_tools"
+import_name = "chipwhisperer_enahnced_plugins"
 
 try:
     import pybind11

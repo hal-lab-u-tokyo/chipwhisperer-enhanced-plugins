@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:58
-*    Last Modified: 24-01-2024 23:04:01
+*    Last Modified: 28-01-2024 17:24:15
 */
 
 #ifndef FASTCPAOPENCL_H
@@ -49,25 +49,13 @@
 	} \
 }
 
-class FastCPAOpenCL : public FastCPA
+class FastCPAOpenCLBase : public FastCPA
 {
 public:
-	FastCPAOpenCL(int num_traces, int num_points, AESLeakageModel::ModelBase *model);
-	~FastCPAOpenCL();
-
+	FastCPAOpenCLBase(int num_traces, int num_points, AESLeakageModel::ModelBase *model);
+	~FastCPAOpenCLBase();
 protected:
-
 	cl_mem cl_device_traces, cl_device_hypothetial_leakage, cl_device_sum_hypothesis, cl_device_sum_hypothesis_square, cl_device_sum_hypothesis_trace;
-
-	// overrided functions
-	virtual void setup_arrays(py::array_t<double> &py_traces,
-						py::array_t<uint8_t> &py_plaintext,
-						py::array_t<uint8_t> &py_ciphertext,
-						py::array_t<uint8_t> &py_knownkey);
-	virtual void calculate_hypothesis();
-	virtual void calculate_correlation_subkey(Array3D<double>* diff, long double *sumden2);
-
-private:
 	cl_context context;
 	cl_command_queue command_queue;
 	cl_program sum_hypothesis_kernel_program;
@@ -76,14 +64,39 @@ private:
 	cl_device_id device_id;
 	cl_kernel sum_hypothesis_kernel, sum_hypothesis_trace_kernel;
 
-	void run_sum_hypothesis_kernel();
-	void run_sum_hypothesis_trace_kernel();
+
+	virtual const char** get_sum_hypothesis_kernel_code() { return &sum_hypothesis_kernel_code; }
+	virtual const char** get_sum_hypothesis_trace_kernel_code() { return &sum_hypothesis_trace_kernel_code; }
+	virtual void calculate_hypothesis();
+	virtual void run_sum_hypothesis_kernel();
+	virtual void run_sum_hypothesis_trace_kernel();
+
+private:
+	static cl_platform_id get_target_platform();
+	static cl_device_id get_target_device(cl_platform_id platform_id);
 
 	static const char* sum_hypothesis_kernel_code;
 	static const char* sum_hypothesis_trace_kernel_code;
+};
 
-	static cl_platform_id get_target_platform();
-	static cl_device_id get_target_device(cl_platform_id platform_id);
+
+class FastCPAOpenCL : public FastCPAOpenCLBase
+{
+public:
+	FastCPAOpenCL(int num_traces, int num_points, AESLeakageModel::ModelBase *model);
+
+protected:
+
+	// overrided functions
+	virtual void setup_arrays(py::array_t<double> &py_traces,
+						py::array_t<uint8_t> &py_plaintext,
+						py::array_t<uint8_t> &py_ciphertext,
+						py::array_t<uint8_t> &py_knownkey);
+	virtual void calculate_correlation_subkey(Array3D<double>* diff, long double *sumden2);
+
+private:
+
+
 
 };
 

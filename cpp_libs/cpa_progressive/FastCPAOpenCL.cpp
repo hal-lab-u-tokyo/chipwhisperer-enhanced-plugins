@@ -1,55 +1,25 @@
 #include "FastCPAOpenCL.hpp"
+#include "FastCPAOpenCLFP32.hpp"
 
 #include <string>
 
 using namespace std;
 
-const char* FastCPAOpenCL::sum_hypothesis_kernel_code = R"(
-	__kernel void sum_hypothesis_kernel(
-		int byte_length, int num_guess, int num_traces,
-		__global int* hypothetial_leakage,
-		__global long* sum_hypothesis,
-		__global long* sum_hypothesis_square)
-	{
-		int byte_index = get_global_id(0);
-		int guess = get_global_id(1);
-		if (guess < num_guess) {
-			long sum_hyp = 0;
-			long sum_hyp_square = 0;
-			for (int trace = 0; trace < num_traces; trace++) {
-				int hyp = hypothetial_leakage[byte_index * num_guess * num_traces + guess * num_traces + trace];
-				sum_hyp += hyp;
-				sum_hyp_square += hyp * hyp;
-			}
-			sum_hypothesis[byte_index * num_guess + guess] += sum_hyp;
-			sum_hypothesis_square[byte_index * num_guess + guess] += sum_hyp_square;
-		}
-	}
-)";
+#define OCL_SUM_HYPOTHESIS(x) #x
+const char* FastCPAOpenCLBase::sum_hypothesis_kernel_code =
+#include "device_code.cl"
+;
+#undef OCL_SUM_HYPOTHESIS
 
-const char* FastCPAOpenCL::sum_hypothesis_trace_kernel_code = R"(
-	__kernel void sum_hypothesis_trace_kernel(
-		int byte_length, int num_guess, int num_traces, int num_points,
-		__global int* hypothetial_leakage,
-		__global double* traces,
-		__global double* sum_hypothesis_trace
-	) {
-		int byte_index = get_global_id(0);
-		int guess = get_global_id(1);
-		int point = get_global_id(2);
-		if (guess < num_guess && point < num_points) {
-			double sum = 0;
-			for (int trace = 0; trace < num_traces; trace++) {
-				int hyp = hypothetial_leakage[byte_index * num_guess * num_traces + guess * num_traces + trace];
-				double trace_value = traces[trace * num_points + point];
-				sum += hyp * trace_value;
-			}
-			sum_hypothesis_trace[byte_index * num_guess * num_points + guess * num_points + point] += sum;
-		}
-	}
-)";
+#define OCL_SUM_HYPOTHESIS_TRACE(...) #__VA_ARGS__
+const char* FastCPAOpenCLBase::sum_hypothesis_trace_kernel_code = 
+#include "device_code.cl"
+;
+#undef OCL_SUM_HYPOTHESIS_TRACE
 
-FastCPAOpenCL::FastCPAOpenCL(int num_traces, int num_points, AESLeakageModel::ModelBase *model) : FastCPA(num_traces, num_points, model),
+// =============================== Base class ===============================
+
+FastCPAOpenCLBase::FastCPAOpenCLBase(int num_traces, int num_points, AESLeakageModel::ModelBase *model) : FastCPA(num_traces, num_points, model),
 	cl_device_traces(nullptr), cl_device_hypothetial_leakage(nullptr),
 	cl_device_sum_hypothesis_trace(nullptr)
 {
@@ -75,55 +45,20 @@ FastCPAOpenCL::FastCPAOpenCL(int num_traces, int num_points, AESLeakageModel::Mo
 	// create buffers
 	ALLOCATE_DEVICE_MEMORY(cl_device_sum_hypothesis, CL_MEM_READ_WRITE,
 						sum_hypothesis->get_size());
-	COPY_TO_DEVICE(cl_device_sum_hypothesis, sum_hypothesis->get_pointer(),
-					sum_hypothesis->get_size());
 	ALLOCATE_DEVICE_MEMORY(cl_device_sum_hypothesis_square,
 							CL_MEM_READ_WRITE,
 							sum_hypothesis_square->get_size());
+
+	// copy initial array data to allocated device memory
+	COPY_TO_DEVICE(cl_device_sum_hypothesis, sum_hypothesis->get_pointer(),
+					sum_hypothesis->get_size());
 	COPY_TO_DEVICE(cl_device_sum_hypothesis_square,
 					sum_hypothesis_square->get_pointer(),
 					sum_hypothesis_square->get_size());
 
-	// // create program
-	sum_hypothesis_kernel_program =
-		clCreateProgramWithSource(context, 1, (const char **)&FastCPAOpenCL::sum_hypothesis_kernel_code, nullptr, &err);
-	if (err != CL_SUCCESS) {
-		throw runtime_error("Error: Failed to create program ("
-							+ to_string(err) + ")");
-	}
-	sum_hypothesis_trace_kernel_program =
-		clCreateProgramWithSource(context, 1, (const char **)&FastCPAOpenCL::sum_hypothesis_trace_kernel_code, nullptr, &err);
-
-	// build program
-	err = clBuildProgram(sum_hypothesis_kernel_program, 1, &device_id, nullptr, nullptr, nullptr);
-	if (err != CL_SUCCESS) {
-		throw runtime_error("Error: Failed to build program \"sum_hypothesis_kernel\" ("
-							+ to_string(err) + ")");
-	}
-	err = clBuildProgram(sum_hypothesis_trace_kernel_program, 1, &device_id, nullptr, nullptr, nullptr);
-	if (err != CL_SUCCESS) {
-		throw runtime_error("Error: Failed to build program \"sum_hypothesis_kernel\" ("
-							+ to_string(err) + ")");
-	}
-	// create kernel
-	sum_hypothesis_kernel = clCreateKernel(sum_hypothesis_kernel_program,
-								"sum_hypothesis_kernel", &err);
-	if (err != CL_SUCCESS) {
-		throw runtime_error("Error: Failed to create kernel \"sum_hypothesis_kernel\" ("
-							+ to_string(err) + ")");
-	}
-	sum_hypothesis_trace_kernel
-		= clCreateKernel(sum_hypothesis_trace_kernel_program,
-								"sum_hypothesis_trace_kernel", &err);
-	if (err != CL_SUCCESS) {
-		throw runtime_error("Error: Failed to create kernel \"sum_hypothesis_trace_kernel\" ("
-							+ to_string(err) + ")");
-	}
-
-	clFinish(command_queue);
 }
 
-FastCPAOpenCL::~FastCPAOpenCL()
+FastCPAOpenCLBase::~FastCPAOpenCLBase()
 {
 	// release memory
 	clReleaseMemObject(cl_device_traces);
@@ -140,7 +75,7 @@ FastCPAOpenCL::~FastCPAOpenCL()
 	clReleaseContext(context);
 }
 
-cl_platform_id FastCPAOpenCL::get_target_platform()
+cl_platform_id FastCPAOpenCLBase::get_target_platform()
 {
 	cl_int err;
 	cl_uint platformCount;
@@ -174,7 +109,7 @@ cl_platform_id FastCPAOpenCL::get_target_platform()
 	return platform;
 }
 
-cl_device_id FastCPAOpenCL::get_target_device(cl_platform_id platform)
+cl_device_id FastCPAOpenCLBase::get_target_device(cl_platform_id platform)
 {
 	cl_int err;
 	cl_device_id target_device;
@@ -206,6 +141,121 @@ cl_device_id FastCPAOpenCL::get_target_device(cl_platform_id platform)
 	}
 
 	return target_device;
+}
+
+void FastCPAOpenCLBase::calculate_hypothesis()
+{
+	FastCPA::calculate_hypothesis();
+	// copy CPU calculated hypothetial_leakage to GPU
+	COPY_TO_DEVICE(cl_device_hypothetial_leakage,
+					hypothetial_leakage->get_pointer(),
+					hypothetial_leakage->get_size());
+	clFinish(command_queue);
+}
+
+
+void FastCPAOpenCLBase::run_sum_hypothesis_kernel()
+{
+	cl_int err;
+	size_t global_work_size[2] = {(size_t)byte_length, (size_t)(NUM_GUESSES)};
+
+	// set kernel arguments
+	clSetKernelArg(sum_hypothesis_kernel, 0, sizeof(int), &byte_length);
+	clSetKernelArg(sum_hypothesis_kernel, 1, sizeof(int), &NUM_GUESSES);
+	clSetKernelArg(sum_hypothesis_kernel, 2, sizeof(int), &num_traces);
+	clSetKernelArg(sum_hypothesis_kernel, 3, sizeof(cl_mem),
+					&cl_device_hypothetial_leakage);
+	clSetKernelArg(sum_hypothesis_kernel, 4, sizeof(cl_mem),
+					&cl_device_sum_hypothesis);
+	clSetKernelArg(sum_hypothesis_kernel, 5, sizeof(cl_mem),
+					&cl_device_sum_hypothesis_square);
+	err = clEnqueueNDRangeKernel(command_queue, sum_hypothesis_kernel,
+								2, nullptr, global_work_size, nullptr,
+								0, nullptr, nullptr);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to execute kernel \"sum_hypothesis_kernel\" ("
+							+ to_string(err) + ")");
+	}
+	clFinish(command_queue);
+}
+
+void FastCPAOpenCLBase::run_sum_hypothesis_trace_kernel()
+{
+	cl_int err;
+	size_t global_work_size[3] =
+		{(size_t)byte_length, (size_t)NUM_GUESSES, (size_t)num_points};
+
+	clSetKernelArg(sum_hypothesis_trace_kernel, 0, sizeof(int), &byte_length);
+	clSetKernelArg(sum_hypothesis_trace_kernel, 1, sizeof(int), &NUM_GUESSES);
+	clSetKernelArg(sum_hypothesis_trace_kernel, 2, sizeof(int), &num_traces);
+	clSetKernelArg(sum_hypothesis_trace_kernel, 3, sizeof(int), &num_points);
+	clSetKernelArg(sum_hypothesis_trace_kernel, 4, sizeof(cl_mem),
+					&cl_device_hypothetial_leakage);
+	clSetKernelArg(sum_hypothesis_trace_kernel, 5, sizeof(cl_mem),
+					&cl_device_traces);
+	clSetKernelArg(sum_hypothesis_trace_kernel, 6, sizeof(cl_mem),
+					&cl_device_sum_hypothesis_trace);
+
+	err = clEnqueueNDRangeKernel(command_queue, sum_hypothesis_trace_kernel,
+								3, nullptr, global_work_size, nullptr,
+								0, nullptr, nullptr);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to execute kernel \"sum_hypothesis_trace_kernel\" ("
+							+ to_string(err) + ")");
+	}
+	clFinish(command_queue);
+}
+
+
+// =============================== Derived class ===============================
+
+FastCPAOpenCL::FastCPAOpenCL(int num_traces, int num_points, AESLeakageModel::ModelBase *model) : 
+	FastCPAOpenCLBase(num_traces, num_points, model)
+{
+	cl_int err;
+
+	// create program
+	sum_hypothesis_kernel_program =
+		clCreateProgramWithSource(context, 1, get_sum_hypothesis_kernel_code(), nullptr, &err);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to create program ("
+							+ to_string(err) + ")");
+	}
+	sum_hypothesis_trace_kernel_program =
+		clCreateProgramWithSource(context, 1, get_sum_hypothesis_trace_kernel_code(), nullptr, &err);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to create program ("
+							+ to_string(err) + ")");
+	}
+
+	// build program
+	err = clBuildProgram(sum_hypothesis_kernel_program, 1, &device_id, nullptr, nullptr, nullptr);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to build program \"sum_hypothesis_kernel\" ("
+							+ to_string(err) + ")");
+	}
+	err = clBuildProgram(sum_hypothesis_trace_kernel_program, 1, &device_id, nullptr, nullptr, nullptr);
+	if (err != CL_SUCCESS) {
+			throw runtime_error("Error: Failed to build program \"sum_hypothesis_trace_kernel\" ("
+							+ to_string(err) + ")");
+	}
+	// create kernel
+	sum_hypothesis_kernel = clCreateKernel(sum_hypothesis_kernel_program,
+								"sum_hypothesis_kernel", &err);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to create kernel \"sum_hypothesis_kernel\" ("
+							+ to_string(err) + ")");
+	}
+	sum_hypothesis_trace_kernel
+		= clCreateKernel(sum_hypothesis_trace_kernel_program,
+								"sum_hypothesis_trace_kernel", &err);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to create kernel \"sum_hypothesis_trace_kernel\" ("
+							+ to_string(err) + ")");
+	}
+
+	clFinish(command_queue);
+
 }
 
 
@@ -249,66 +299,6 @@ void FastCPAOpenCL::setup_arrays(py::array_t<double> &py_traces,
 	clFinish(command_queue);
 }
 
-void FastCPAOpenCL::calculate_hypothesis()
-{
-	FastCPA::calculate_hypothesis();
-	// copy CPU calculated hypothetial_leakage to GPU
-	COPY_TO_DEVICE(cl_device_hypothetial_leakage,
-					hypothetial_leakage->get_pointer(),
-					hypothetial_leakage->get_size());
-	clFinish(command_queue);
-}
-
-void FastCPAOpenCL::run_sum_hypothesis_kernel()
-{
-	cl_int err;
-	size_t global_work_size[2] = {(size_t)byte_length, (size_t)NUM_GUESSES};
-	// set kernel arguments
-	clSetKernelArg(sum_hypothesis_kernel, 0, sizeof(int), &byte_length);
-	clSetKernelArg(sum_hypothesis_kernel, 1, sizeof(int), &NUM_GUESSES);
-	clSetKernelArg(sum_hypothesis_kernel, 2, sizeof(int), &num_traces);
-	clSetKernelArg(sum_hypothesis_kernel, 3, sizeof(cl_mem),
-					&cl_device_hypothetial_leakage);
-	clSetKernelArg(sum_hypothesis_kernel, 4, sizeof(cl_mem),
-					&cl_device_sum_hypothesis);
-	clSetKernelArg(sum_hypothesis_kernel, 5, sizeof(cl_mem),
-					&cl_device_sum_hypothesis_square);
-	err = clEnqueueNDRangeKernel(command_queue, sum_hypothesis_kernel,
-								2, nullptr, global_work_size, nullptr,
-								0, nullptr, nullptr);
-	if (err != CL_SUCCESS) {
-		throw runtime_error("Error: Failed to execute kernel \"sum_hypothesis_kernel\" ("
-							+ to_string(err) + ")");
-	}
-	clFinish(command_queue);
-}
-
-void FastCPAOpenCL::run_sum_hypothesis_trace_kernel()
-{
-	cl_int err;
-	size_t global_work_size[3] =
-		{(size_t)byte_length, (size_t)NUM_GUESSES, (size_t)num_points};
-
-	clSetKernelArg(sum_hypothesis_trace_kernel, 0, sizeof(int), &byte_length);
-	clSetKernelArg(sum_hypothesis_trace_kernel, 1, sizeof(int), &NUM_GUESSES);
-	clSetKernelArg(sum_hypothesis_trace_kernel, 2, sizeof(int), &num_traces);
-	clSetKernelArg(sum_hypothesis_trace_kernel, 3, sizeof(int), &num_points);
-	clSetKernelArg(sum_hypothesis_trace_kernel, 4, sizeof(cl_mem),
-					&cl_device_hypothetial_leakage);
-	clSetKernelArg(sum_hypothesis_trace_kernel, 5, sizeof(cl_mem),
-					&cl_device_traces);
-	clSetKernelArg(sum_hypothesis_trace_kernel, 6, sizeof(cl_mem),
-					&cl_device_sum_hypothesis_trace);
-
-	err = clEnqueueNDRangeKernel(command_queue, sum_hypothesis_trace_kernel,
-								3, nullptr, global_work_size, nullptr,
-								0, nullptr, nullptr);
-	if (err != CL_SUCCESS) {
-		throw runtime_error("Error: Failed to execute kernel \"sum_hypothesis_trace_kernel\" ("
-							+ to_string(err) + ")");
-	}
-	clFinish(command_queue);
-}
 
 void FastCPAOpenCL::calculate_correlation_subkey(Array3D<double>* diff, long double *sumden2) {
 
@@ -355,6 +345,9 @@ void FastCPAOpenCL::calculate_correlation_subkey(Array3D<double>* diff, long dou
 PYBIND11_MODULE(cpa_opencl_kernel, module) {
 	module.doc() = "OpenCL implemetation plugin for CPA";
 	py::class_<FastCPAOpenCL,FastCPA>(module, "FastCPAOpenCL")
+		.def(py::init<int, int, AESLeakageModel::ModelBase*>());
+
+	py::class_<FastCPAOpenCLFP32,FastCPA>(module, "FastCPAOpenCLFP32")
 		.def(py::init<int, int, AESLeakageModel::ModelBase*>());
 
 }

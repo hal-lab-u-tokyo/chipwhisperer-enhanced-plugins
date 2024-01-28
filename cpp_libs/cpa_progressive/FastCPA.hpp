@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:54
-*    Last Modified: 23-01-2024 16:56:55
+*    Last Modified: 28-01-2024 19:55:48
 */
 
 #ifndef FAST_CPA_H
@@ -24,7 +24,7 @@ namespace py = pybind11;
 
 class FastCPA {
 public:
-	static constexpr int NUM_GUESSES = 256;
+	const int NUM_GUESSES = 256;
 	// Constructor
 	FastCPA(int byte_length, int num_points, AESLeakageModel::ModelBase *model) :
 		byte_length(byte_length), num_points(num_points), total_traces(0), model(model) {

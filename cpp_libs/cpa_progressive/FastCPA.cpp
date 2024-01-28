@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 23-01-2024 16:57:39
+*    Last Modified: 28-01-2024 19:42:28
 */
 
 
@@ -115,7 +115,7 @@ void FastCPA::calculate_hypothesis() {
 		// loop for each guess
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
 			// fill the guess key
-			uint8_t key[byte_length] = {0};
+			uint8_t *key = new uint8_t[byte_length]();
 			key[byte_index] = guess;
 			for (int t = 0; t < num_traces; t++) {
 				// calc hypothetical leakage using the model
@@ -125,6 +125,7 @@ void FastCPA::calculate_hypothesis() {
 									key,
 									byte_index);
 			}
+			delete[] key;
 		}
 	}
 }

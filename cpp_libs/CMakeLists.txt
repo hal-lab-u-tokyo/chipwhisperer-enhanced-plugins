@@ -5,12 +5,12 @@
 #    Project:       tkojima
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  16-01-2024 21:01:52
-#    Last Modified: 22-01-2024 14:09:26
+#    Last Modified: 28-01-2024 19:57:49
 #
 
 cmake_minimum_required(VERSION 3.20)
 
-project(pybind_kernel VERSION 0.1.0)
+project(cw_enhanced_plugin_cpp_libs VERSION 0.1.0)
 set(Python_VIRTUALENV FIRST)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
@@ -23,6 +23,23 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 find_package(pybind11 REQUIRED HINTS ${PYBIND11_SITE_PACKAGES})
+set(CMAKE_CXX_STANDARD 11)
+
+# find OpenMP support for MacOS
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	execute_process(COMMAND brew --prefix libomp
+					OUTPUT_VARIABLE OpenMP_ROOT
+					OUTPUT_STRIP_TRAILING_WHITESPACE)  
+
+	set(OpenMP_C_LIB_NAMES "omp")
+	set(OpenMP_CXX_LIB_NAMES "omp")
+	set(OpenMP_omp_LIBRARY "${OpenMP_ROOT}/lib/")
+
+	include_directories("${OpenMP_ROOT}/include")
+	link_directories("${OpenMP_ROOT}/lib/")
+	set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -lomp")
+
+endif()
 
 find_package(OpenMP)
 find_package(CUDA)

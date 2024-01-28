@@ -37,7 +37,7 @@ FastCPAOpenCLFP32::FastCPAOpenCLFP32(int num_traces, int num_points, AESLeakageM
 	}
 	err = clBuildProgram(sum_hypothesis_trace_kernel_program, 1, &device_id, nullptr, nullptr, nullptr);
 	if (err != CL_SUCCESS) {
-			throw runtime_error("Error: Failed to build program \"sum_hypothesis_trace_kernel\" ("
+		throw runtime_error("Error: Failed to build program \"sum_hypothesis_trace_kernel\" ("
 							+ to_string(err) + ")");
 	}
 	// create kernel

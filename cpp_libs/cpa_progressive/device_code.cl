@@ -71,18 +71,17 @@ OCL_SUM_HYPOTHESIS_TRACE_FP32(
 		float2 s = a + b;
 		float2 v = s - a;
 		float2 e = (a - (s - v)) + (b - v);
-		return (float4)(s, e);
+		return (float4)(s.x, e.x, s.y, e.y);
 	}
 
 	inline float2 df64_add(float2 a, float2 b)
 	{
 		float4 st = twoSum(a, b);
 		st.y += st.z;
-		float2 s = quickTwoSum(st.x, st.y);
-		st.xy += s;
+		st.xy = quickTwoSum(st.x, st.y);
 		st.y += st.w;
-		s = quickTwoSum(st.x, st.y);
-		return s;
+		st.xy = quickTwoSum(st.x, st.y);
+		return st.xy;
 	}
 
 	inline float2 twoProdFMA(float a, float b)
@@ -114,7 +113,6 @@ OCL_SUM_HYPOTHESIS_TRACE_FP32(
 		for (int trace = 0; trace < num_traces; trace++) {
 			int hyp = hypothetial_leakage[byte_index * num_guess * num_traces + guess * num_traces + trace];
 			float2 trace_value = traces[trace * num_points + point];
-			// sum += hyp * trace_value;
 			float2 prod = df64_mul((float2)((float)hyp, 0), trace_value);
 			sum = df64_add(sum, prod);
 		}

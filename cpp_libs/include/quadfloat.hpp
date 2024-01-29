@@ -17,9 +17,10 @@ namespace QuadFloat {
 		QF128(double hi, double lo) : hi(hi), lo(lo) {}
 		QF128(int x) : hi((double)x), lo(0) {}
 		QF128(long int x) : hi((double)x), lo(0) {}
+		QF128(long long x) : hi((double)x), lo(0) {}
 		// cast to double
 		explicit operator double() const {
-			return hi;
+			return hi + lo;
 		}
 
 		QF128 operator+(QF128 x) const;
@@ -77,6 +78,18 @@ namespace QuadFloat {
 			return *this * QF128(x);
 		}
 
+
+		QF128 operator+(const long long &x) const {
+			return *this + QF128(x);
+		}
+
+		QF128 operator-(const long long &x) const {
+			return *this - QF128(x);
+		}
+
+		QF128 operator*(const long long &x) const {
+			return *this * QF128(x);
+		}
 	};
 };
 

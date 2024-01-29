@@ -5,12 +5,16 @@
 #    Project:       sca_toolbox
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  23-01-2024 16:57:09
-#    Last Modified: 28-01-2024 04:35:32
+#    Last Modified: 29-01-2024 21:52:04
 #
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cpa_algorithms)
 
 add_library(cpa_common STATIC FastCPA.cpp AESLeakageModel.cpp)
+if (NOT HAVE_QUAD_PRECISION)
+	target_link_libraries(cpa_common PRIVATE quadfloat)
+endif()
+
 target_include_directories(cpa_common PRIVATE ${pybind11_INCLUDE_DIRS})
 
 pybind11_add_module(cpa_kernel bind.cpp)
@@ -26,3 +30,4 @@ if (OpenCL_FOUND)
 	target_include_directories(cpa_opencl_kernel PRIVATE ${OpenCL_INCLUDE_DIRS})
 	target_link_libraries(cpa_opencl_kernel PRIVATE ${OpenCL_LIBRARIES} cpa_common)
 endif()
+

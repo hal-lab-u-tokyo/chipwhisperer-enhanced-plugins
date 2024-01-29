@@ -5,7 +5,7 @@
 #    Project:       tkojima
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  16-01-2024 21:01:52
-#    Last Modified: 28-01-2024 19:57:49
+#    Last Modified: 30-01-2024 00:28:29
 #
 
 cmake_minimum_required(VERSION 3.20)
@@ -13,6 +13,9 @@ cmake_minimum_required(VERSION 3.20)
 project(cw_enhanced_plugin_cpp_libs VERSION 0.1.0)
 set(Python_VIRTUALENV FIRST)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+# add include directory globally
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # find the pybind11 package for giving hints
 execute_process(
@@ -24,6 +27,13 @@ execute_process(
 )
 find_package(pybind11 REQUIRED HINTS ${PYBIND11_SITE_PACKAGES})
 set(CMAKE_CXX_STANDARD 11)
+
+# check if quad precision is supported on the system
+include(./cmake/quadfloat.cmake)
+if (NOT ${HAVE_QUAD_PRECISION})
+	add_subdirectory(soft_quadfloat)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSOFT_QUAD_PRECISION")
+endif()
 
 # find OpenMP support for MacOS
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -60,6 +70,9 @@ if (CUDA_FOUND)
 	enable_language(CUDA)
 	if (OpenMP_FOUND)
 		set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${OpenMP_CXX_FLAGS}")
+		if (NOT ${HAVE_QUAD_PRECISION})
+			set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSOFT_QUAD_PRECISION")
+		endif()
 	endif()
 else()
 	message(STATUS "Skip building CUDA libraries")

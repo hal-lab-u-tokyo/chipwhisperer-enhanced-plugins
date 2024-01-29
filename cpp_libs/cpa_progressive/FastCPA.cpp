@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 28-01-2024 19:42:28
+*    Last Modified: 29-01-2024 22:47:46
 */
 
 
@@ -37,7 +37,7 @@ py::array_t<double> FastCPA::calculate_correlation(py::array_t<double> &py_trace
 
 	update_sum_trace();
 
-	long double *sumden2 = new long double[num_points];
+	QUADFLOAT *sumden2 = new QUADFLOAT[num_points];
 	calclualte_sumden2(sumden2);
 
 	calculate_hypothesis();
@@ -91,18 +91,20 @@ void FastCPA::update_sum_trace() {
 	#endif
 	for (int p = 0; p < num_points; p++) {
 		for (int t = 0; t < num_traces; t++) {
+			QUADFLOAT prev = sum_trace[p];
 			sum_trace[p] += traces->at(t, p);
 			sum_trace_square[p] += SQUARE(traces->at(t, p));
 		}
 	}
 }
 
-void FastCPA::calclualte_sumden2(long double *sumden2) {
+void FastCPA::calclualte_sumden2(QUADFLOAT *sumden2) {
+
 	#ifdef _OPENMP
 	#pragma omp parallel for
 	#endif
 	for (int p = 0; p < num_points; p++) {
-		sumden2[p] = std::fma(-(long double)total_traces, sum_trace_square[p], SQUARE(sum_trace[p]));
+		sumden2[p] = SQUARE(sum_trace[p]) - (QUADFLOAT)total_traces * sum_trace_square[p];
 	}
 }
 
@@ -130,16 +132,16 @@ void FastCPA::calculate_hypothesis() {
 	}
 }
 
-void FastCPA::calculate_correlation_subkey(Array3D<double>* diff, long double *sumden2) {
-	long double sumden1;
+
+void FastCPA::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2) {
+
+	QUADFLOAT sumden1;
 	// loop for each byte
 	#ifdef _OPENMP
 	#pragma omp parallel for collapse(2) private(sumden1)
 	#endif
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
-			// long double *sumnum = new long double[num_points];
-			// sum up hypothesis
 			for (int t = 0; t < num_traces; t++) {
 				auto hyp = hypothetial_leakage->at(byte_index, guess, t);
 				sum_hypothesis->at(byte_index, guess) += hyp;
@@ -157,13 +159,13 @@ void FastCPA::calculate_correlation_subkey(Array3D<double>* diff, long double *s
 
 			// calc sumnum
 			for (int p = 0; p < num_points; p++) {
-				long double sumnum =
-					total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
-					- sum_hypothesis->at(byte_index, guess) * sum_trace[p];
+				QUADFLOAT sumnum = (QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
+					- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
 
-				diff->at(byte_index, guess, p) = sumnum / std::sqrt(sumden1 * sumden2[p]);
+				diff->at(byte_index, guess, p) = (double)sumnum / std::sqrt((double)sumden1 * (double)sumden2[p]);
 			}
 		}
 	}
+
 }
 

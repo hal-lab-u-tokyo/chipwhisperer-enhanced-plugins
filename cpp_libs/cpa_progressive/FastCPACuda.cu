@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:31
-*    Last Modified: 24-01-2024 18:13:10
+*    Last Modified: 29-01-2024 22:09:28
 */
 
 #include <pybind11/pybind11.h>
@@ -140,7 +140,7 @@ void sum_hypothesis_trace_kernel(int byte_length, int num_guess,
 }
 
 
-void FastCPACuda::calculate_correlation_subkey(Array3D<double>* diff, long double *sumden2) {
+void FastCPACuda::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2) {
 
 	// offload to GPU for sum_hypothesis, sum_hypothesis_square
 	dim3 dimBlock(32);
@@ -183,15 +183,15 @@ void FastCPACuda::calculate_correlation_subkey(Array3D<double>* diff, long doubl
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
 			// calc sumden1
-			long double sumden1 = SQUARE(sum_hypothesis->at(byte_index, guess))
+			QUADFLOAT sumden1 = SQUARE(sum_hypothesis->at(byte_index, guess))
 				- total_traces * sum_hypothesis_square->at(byte_index, guess);
 			// calc sumnum
-			long double sumnum;
+			QUADFLOAT sumnum;
 			for (int p = 0; p < num_points; p++) {
 				sumnum =
-					total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
-					- sum_hypothesis->at(byte_index, guess) * sum_trace[p];
-				diff->at(byte_index, guess, p) = sumnum / std::sqrt(sumden1 * sumden2[p]);
+					(QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
+					- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
+				diff->at(byte_index, guess, p) = (double)sumnum / std::sqrt((double)sumden1 * (double)sumden2[p]);
 			}
 		}
 	}

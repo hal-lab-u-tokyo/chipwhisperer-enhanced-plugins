@@ -117,7 +117,7 @@ void FastCPAOpenCLFP32::setup_arrays(py::array_t<double> &py_traces,
 }
 
 
-void FastCPAOpenCLFP32::calculate_correlation_subkey(Array3D<double>* diff, long double *sumden2) {
+void FastCPAOpenCLFP32::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2) {
 
 
 	// offload to GPU for sum_hypothesis, sum_hypothesis_square
@@ -148,16 +148,16 @@ void FastCPAOpenCLFP32::calculate_correlation_subkey(Array3D<double>* diff, long
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
 			// calc sumden1
-			long double sumden1 = SQUARE(sum_hypothesis->at(byte_index, guess))
+			QUADFLOAT sumden1 = SQUARE(sum_hypothesis->at(byte_index, guess))
 				- total_traces * sum_hypothesis_square->at(byte_index, guess);
 
 			// calc sumnum
-			long double sumnum;
+			QUADFLOAT sumnum;
 			for (int p = 0; p < num_points; p++) {
 				sumnum =
-					total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
-					- sum_hypothesis->at(byte_index, guess) * sum_trace[p];
-				diff->at(byte_index, guess, p) = sumnum / std::sqrt(sumden1 * sumden2[p]);
+					(QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
+					- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
+				diff->at(byte_index, guess, p) = (double)sumnum / std::sqrt((double)sumden1 * (double)sumden2[p]);
 			}
 		}
 	}

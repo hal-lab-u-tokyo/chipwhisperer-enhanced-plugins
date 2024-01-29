@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:58
-*    Last Modified: 23-01-2024 16:56:59
+*    Last Modified: 29-01-2024 22:09:11
 */
 
 #ifndef FASTCPACUDA_H
@@ -50,7 +50,10 @@ protected:
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey);
 	virtual void calculate_hypothesis();
-	virtual void calculate_correlation_subkey(Array3D<double>* diff, long double *sumden2);
+	virtual void calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2);
+	virtual void calclualte_sumden2(QUADFLOAT *sumden2) {
+		FastCPA::calclualte_sumden2(sumden2);
+	};
 
 };
 

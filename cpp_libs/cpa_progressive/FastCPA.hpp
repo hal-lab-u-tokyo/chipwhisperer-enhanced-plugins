@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:54
-*    Last Modified: 28-01-2024 19:55:48
+*    Last Modified: 30-01-2024 00:27:36
 */
 
 #ifndef FAST_CPA_H
@@ -22,6 +22,13 @@ namespace py = pybind11;
 
 #define SQUARE(x) ((x) * (x))
 
+#ifdef SOFT_QUAD_PRECISION
+#include <quadfloat.hpp>
+using QUADFLOAT = QuadFloat::QF128;
+#else
+using QUADFLOAT = long double;
+#endif
+
 class FastCPA {
 public:
 	const int NUM_GUESSES = 256;
@@ -30,8 +37,8 @@ public:
 		byte_length(byte_length), num_points(num_points), total_traces(0), model(model) {
 
 		// init arrays
-		sum_trace = new long double[num_points]();
-		sum_trace_square = new long double[num_points]();
+		sum_trace = new QUADFLOAT[num_points]();
+		sum_trace_square = new QUADFLOAT[num_points]();
 
 		sum_hypothesis = new Array2D<int64_t>(byte_length, NUM_GUESSES);
 		sum_hypothesis_square = new Array2D<int64_t>(byte_length, NUM_GUESSES);
@@ -59,8 +66,8 @@ protected:
 	uint8_t *knownkey; // [0:num_traces][0:byte_length
 
 	// preserved intermediate results
-	long double *sum_trace; // [0:num_points]
-	long double *sum_trace_square; // [0:num_points]
+	QUADFLOAT *sum_trace; // [0:num_points]
+	QUADFLOAT *sum_trace_square; // [0:num_points]
 
 	Array3D<int> *hypothetial_leakage; // [0:byte_length][0:num_guesses][0:num_traces]
 
@@ -70,9 +77,9 @@ protected:
 	Array3D<double> *sum_hypothesis_trace; // [0:byte_length][0:num_guesses][0:num_points]
 
 	virtual void update_sum_trace();
-	virtual void calclualte_sumden2(long double *sumden2);
+	virtual void calclualte_sumden2(QUADFLOAT *sumden2);
 	virtual void calculate_hypothesis();
-	virtual void calculate_correlation_subkey(Array3D<double>* diff, long double *sumden2);
+	virtual void calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2);
 
 
 	virtual void setup_arrays(py::array_t<double> &py_traces,

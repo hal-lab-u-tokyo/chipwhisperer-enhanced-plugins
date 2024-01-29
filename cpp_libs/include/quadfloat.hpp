@@ -20,7 +20,7 @@ namespace QuadFloat {
 		QF128(long long x) : hi((double)x), lo(0) {}
 		// cast to double
 		explicit operator double() const {
-			return hi + lo;
+			return hi;
 		}
 
 		QF128 operator+(QF128 x) const;

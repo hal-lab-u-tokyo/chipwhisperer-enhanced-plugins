@@ -1,3 +1,14 @@
+/*
+*    Copyright (C) 2024 The University of Tokyo
+*    
+*    File:          /cpp_libs/cpa_progressive/FastCPAOpenCLFP32.cpp
+*    Project:       sca_toolbox
+*    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+*    Created Date:  30-01-2024 12:31:39
+*    Last Modified: 30-01-2024 21:00:41
+*/
+
+
 #include "FastCPAOpenCLFP32.hpp"
 
 #include <string>

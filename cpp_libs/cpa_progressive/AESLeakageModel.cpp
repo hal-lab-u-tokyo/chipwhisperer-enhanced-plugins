@@ -1,11 +1,18 @@
+/*
+*    Copyright (C) 2024 The University of Tokyo
+*    
+*    File:          /cpp_libs/cpa_progressive/AESLeakageModel.cpp
+*    Project:       sca_toolbox
+*    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+*    Created Date:  30-01-2024 12:30:57
+*    Last Modified: 30-01-2024 12:31:15
+*/
+
+
 #include "AESLeakageModel.hpp"
 
-
 using namespace AESLeakageModel;
-// int ModelBase::leakage(py::array_t<uint8_t> &py_plaintext, py::array_t<uint8_t> &py_ciphertext, py::array_t<uint8_t> &py_key, int byte_index)
-// {
-// 	return hamming_weight[leakage_impl((uint8_t *)py_plaintext.request().ptr, (uint8_t *)py_ciphertext.request().ptr, (uint8_t *)py_key.request().ptr, byte_index)];
-// }
+
 
 int SBoxOutput::leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index)
 {

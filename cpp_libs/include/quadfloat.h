@@ -1,3 +1,13 @@
+/*
+*    Copyright (C) 2024 The University of Tokyo
+*    
+*    File:          /cpp_libs/include/quadfloat.h
+*    Project:       sca_toolbox
+*    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+*    Created Date:  30-01-2024 12:28:05
+*    Last Modified: 30-01-2024 12:28:31
+*/
+
 #ifndef QUADFLOAT_H
 #define QUADFLOAT_H
 

@@ -3,10 +3,10 @@ This repository contains enhanced plugins for Chipwhisperer.
 The plugins are designed to be used with the Chipwhisperer platform.
 
 ## Extended features
-* Target device
+* Target devices
   * SAKURA-X board
   * ESP32
-* Capture device
+* Capture devices
   * Keysight Infiniviion 40000 (MSO-X 4101A tested)
   * Rigol MSO8000 (MSO8104 tested)
 * Analysis algorithm
@@ -33,7 +33,7 @@ Recommended to use the Docker image with docmer-compose.
 
 See [docker](docs/docker.md)
 
-For MacOS users, `install_mac.sh` is provided to install this repository and its dependencies.
+For MacOS users, [install_mac.sh](./install_mac.sh) is provided to install this repository and its dependencies.
 
 ## Special Thanks to Those Who Assisted in this development
 * Masaki Morita

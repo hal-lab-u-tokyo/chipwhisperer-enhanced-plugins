@@ -14,6 +14,8 @@ The plugins are designed to be used with the Chipwhisperer platform.
     * OpenMP parallelization
 	* CUDA for NVIDIA GPU
     * OpenCL for AMD, Intel, Apple GPUs
+  * Quad-precision floating-point emulation for double-precision-only CPU (e.g, Apple Silicon CPUs)
+  * Double-precision floating-point emulation in OpenCL for single-precision-only GPUs (e.g., Apple Silicon GPUs, Intel Arc GPUs)
 
 ## Contents
 * lib: python library source

@@ -15,3 +15,8 @@ services:
       - /dev/dri:/dev/dri
       - /dev/kfd:/dev/kfd
 
+    # if you want to specify the OpenCL platform and device, you can set the following environment variables
+    # environment:
+    #   - CL_PLATFORM=0
+    #   - CL_DEVICE=0
+

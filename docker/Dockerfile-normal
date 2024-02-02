@@ -32,4 +32,4 @@ WORKDIR /workspace
 # add entrypoint
 ADD ./docker/launch_notebook.sh /usr/local/bin/launch_notebook.sh
 RUN chmod +x /usr/local/bin/launch_notebook.sh
-ENTRYPOINT [ "/usr/local/bin/launch_notebook.sh" ]
+CMD [ "/usr/local/bin/launch_notebook.sh" ]

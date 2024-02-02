@@ -2,7 +2,7 @@ from setuptools import setup, find_packages, Extension
 import subprocess
 import os
 
-import_name = "chipwhisperer_enahnced_plugins"
+import_name = "cw_plugins"
 
 try:
     import pybind11

@@ -1,4 +1,4 @@
-# Chipwhisperer-Enahnced-Plugins
+# Chipwhisperer-Enhanced-Plugins
 This repository contains enhanced plugins for Chipwhisperer.
 The plugins are designed to be used with the Chipwhisperer platform.
 

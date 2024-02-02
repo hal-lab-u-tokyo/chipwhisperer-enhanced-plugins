@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  notebook:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-normal
+    image: cw-ext-notebooks:normal
+    container_name: chipwhisperer-notebook
+    environment:
+      - JUPYTER_PORT=${JUPYTER_PORT:-8888}
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-chipwhisperer}
+    ports:
+      - ${JUPYTER_PORT:-8888}:${JUPYTER_PORT:-8888}
+    volumes:
+      - ${NOTEBOOK_DIR:-./notebooks}:/workspace/notebooks
+      - ${DATA_DIR:-./data}:/workspace/data

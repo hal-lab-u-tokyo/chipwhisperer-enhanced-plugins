@@ -1,0 +1,35 @@
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+
+LABEL maintener="Takuya Kojima <tkojima@hal.ipc.i.u-tokyo.ac.jp>"
+
+ENV JUPYTER_PORT=8888
+ENV NOTEBOOK_TOKEN=chipwhisperer
+
+RUN apt-get update && apt-get install -y \
+	build-essential \
+	cmake \
+	git \
+	python3-dev \
+	python3-pip \
+	&& rm -rf /var/lib/apt/lists/*
+
+# pull chipwhisperer and install
+RUN cd /opt && git clone https://github.com/newaetech/chipwhisperer.git && \
+	cd chipwhisperer && git checkout 5.7.0 && \
+	git submodule update --init jupyter && \
+	pip3 install . && \
+	pip3 install -r jupyter/requirements.txt
+
+RUN pip3 install pybind11
+
+# build & install chipwhisperer-enhanced-plugins
+COPY . /opt/chipwhisperer-enhanced-plugins
+RUN cd /opt/chipwhisperer-enhanced-plugins && pip3 install .
+
+RUN mkdir -p /workspace/notebooks && mkdir /workspace/data
+WORKDIR /workspace
+
+# add entrypoint
+ADD ./docker/launch_notebook.sh /usr/local/bin/launch_notebook.sh
+RUN chmod +x /usr/local/bin/launch_notebook.sh
+ENTRYPOINT [ "/usr/local/bin/launch_notebook.sh" ]

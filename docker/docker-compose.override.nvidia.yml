@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  notebook:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-nvidia
+    image: cw-ext-notebooks:nvidia
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['0'] # if you have multiple GPUs, you can specify which one to use
+            capabilities: [gpu]

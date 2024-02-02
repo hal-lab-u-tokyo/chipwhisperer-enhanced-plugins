@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:58
-*    Last Modified: 29-01-2024 18:49:48
+*    Last Modified: 02-02-2024 15:46:02
 */
 
 #ifndef FASTCPAOPENCL_H
@@ -95,8 +95,7 @@ protected:
 	virtual void calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2);
 
 private:
-
-
+	bool is_double_available(cl_device_id device_id);
 
 };
 

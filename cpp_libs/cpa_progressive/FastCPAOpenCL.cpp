@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:30
-*    Last Modified: 30-01-2024 12:31:30
+*    Last Modified: 02-02-2024 16:52:31
 */
 
 
@@ -32,13 +32,16 @@ const char* FastCPAOpenCLBase::sum_hypothesis_trace_kernel_code =
 
 FastCPAOpenCLBase::FastCPAOpenCLBase(int num_traces, int num_points, AESLeakageModel::ModelBase *model) : FastCPA(num_traces, num_points, model),
 	cl_device_traces(nullptr), cl_device_hypothetial_leakage(nullptr),
-	cl_device_sum_hypothesis_trace(nullptr)
+	cl_device_sum_hypothesis_trace(nullptr),
+	sum_hypothesis_kernel(nullptr), sum_hypothesis_trace_kernel(nullptr),
+	sum_hypothesis_kernel_program(nullptr), sum_hypothesis_trace_kernel_program(nullptr)
 {
 	cl_int err;
 	// get platform
 	platform_id = get_target_platform();
 	// get device
 	device_id = get_target_device(platform_id);
+
 	// create context
 	context = clCreateContext(nullptr, 1, &device_id, nullptr, nullptr, &err);
 	if (err != CL_SUCCESS) {
@@ -71,17 +74,18 @@ FastCPAOpenCLBase::FastCPAOpenCLBase(int num_traces, int num_points, AESLeakageM
 
 FastCPAOpenCLBase::~FastCPAOpenCLBase()
 {
-	// release memory
-	clReleaseMemObject(cl_device_traces);
-	clReleaseMemObject(cl_device_hypothetial_leakage);
-	clReleaseMemObject(cl_device_sum_hypothesis);
-	clReleaseMemObject(cl_device_sum_hypothesis_square);
-	clReleaseMemObject(cl_device_sum_hypothesis_trace);
-	// release kernel
-	clReleaseKernel(sum_hypothesis_kernel);
-	clReleaseKernel(sum_hypothesis_trace_kernel);
-	clReleaseProgram(sum_hypothesis_kernel_program);
-	clReleaseProgram(sum_hypothesis_trace_kernel_program);
+	// release memory if allocated
+	if (cl_device_traces != nullptr) clReleaseMemObject(cl_device_traces);
+	if (cl_device_hypothetial_leakage != nullptr) clReleaseMemObject(cl_device_hypothetial_leakage);
+	if (cl_device_sum_hypothesis_trace != nullptr) clReleaseMemObject(cl_device_sum_hypothesis_trace);
+	if (cl_device_sum_hypothesis != nullptr) clReleaseMemObject(cl_device_sum_hypothesis);
+	if (cl_device_sum_hypothesis_square != nullptr) clReleaseMemObject(cl_device_sum_hypothesis_square);
+	// release kernel iff kernel is created
+	if (sum_hypothesis_kernel != nullptr) clReleaseKernel(sum_hypothesis_kernel);
+	if (sum_hypothesis_trace_kernel != nullptr) clReleaseKernel(sum_hypothesis_trace_kernel);
+	// release program iff program is created
+	if (sum_hypothesis_kernel_program != nullptr) clReleaseProgram(sum_hypothesis_kernel_program);
+	if (sum_hypothesis_trace_kernel_program != nullptr) clReleaseProgram(sum_hypothesis_trace_kernel_program);
 	clReleaseCommandQueue(command_queue);
 	clReleaseContext(context);
 }
@@ -225,6 +229,11 @@ FastCPAOpenCL::FastCPAOpenCL(int num_traces, int num_points, AESLeakageModel::Mo
 {
 	cl_int err;
 
+	if(!is_double_available(device_id)) {
+		throw runtime_error("Error: Double precision is not supported\n"
+							"Try to use FastCPAOpenCLFP32 instead");
+	}
+
 	// create program
 	sum_hypothesis_kernel_program =
 		clCreateProgramWithSource(context, 1, get_sum_hypothesis_kernel_code(), nullptr, &err);
@@ -351,6 +360,25 @@ void FastCPAOpenCL::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOA
 			}
 		}
 	}
+}
+
+bool FastCPAOpenCL::is_double_available(cl_device_id device_id)
+{
+	cl_int err;
+	size_t ext_size;
+	err = clGetDeviceInfo(device_id, CL_DEVICE_EXTENSIONS, 0, nullptr, &ext_size);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to get device info ("
+							+ to_string(err) + ")");
+	}
+	string ext(ext_size, '\0');
+	err = clGetDeviceInfo(device_id, CL_DEVICE_EXTENSIONS, ext_size, &ext[0], nullptr);
+	if (err != CL_SUCCESS) {
+		throw runtime_error("Error: Failed to get device info ("
+							+ to_string(err) + ")");
+	}
+	size_t pos = ext.find("cl_khr_fp64");
+	return (pos != string::npos);
 }
 
 PYBIND11_MODULE(cpa_opencl_kernel, module) {

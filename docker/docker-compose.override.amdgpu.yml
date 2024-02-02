@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  notebook:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-amdgpu
+    image: cw-ext-notebooks:amdgpu
+
+    security_opt:
+      - seccomp:unconfined
+    group_add:
+      - video
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/kfd:/dev/kfd
+

@@ -1,7 +1,8 @@
 # Build image
+Execute the following command at the root of the repository:
 ## OpenMP enabled image
 ```bash
-docker-compose
+docker-compose build
 ```
 
 ## CUDA enabled image

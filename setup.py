@@ -9,6 +9,8 @@ try:
 except ImportError:
     ext_modules = []
     class CMakeBuild:
+        def __init__(self, *args, **kwargs):
+            pass
         def run(self):
             raise RuntimeError("pybind11 is required to build the C++ extension.")
 else:

@@ -68,6 +68,7 @@ else
 	python3 -m venv $venv_path
 fi
 source $venv_path/bin/activate
+word_dir=`pwd`
 
 # clone chipwhisperer in temp directory
 echo "-- Cloning chipwhisperer."
@@ -84,6 +85,8 @@ if [ $NO_CPP_LIB -eq 0 ]; then
 	echo "-- Installing pybind11."
 	pip3 install pybind11
 fi
+
+cd $work_dir
 
 echo "-- Installing chipwhisperer-enhanced-plugins."
 pip3 install . -v

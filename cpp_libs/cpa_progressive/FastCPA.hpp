@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:54
-*    Last Modified: 30-01-2024 12:28:49
+*    Last Modified: 21-02-2024 13:40:02
 */
 
 #ifndef FAST_CPA_H
@@ -22,12 +22,14 @@ namespace py = pybind11;
 
 #define SQUARE(x) ((x) * (x))
 
-#ifdef SOFT_QUAD_PRECISION
-#include <quadfloat.h>
-using QUADFLOAT = QuadFloat::QF128;
-#else
+// #ifdef SOFT_QUAD_PRECISION
+// #include <quadfloat.h>
+// using QUADFLOAT = QuadFloat::QF128;
+// #else
 using QUADFLOAT = long double;
-#endif
+// #endif
+using TRACE_T = double;
+using RESULT_T = double;
 
 class FastCPA {
 public:
@@ -43,11 +45,11 @@ public:
 		sum_hypothesis = new Array2D<int64_t>(byte_length, NUM_GUESSES);
 		sum_hypothesis_square = new Array2D<int64_t>(byte_length, NUM_GUESSES);
 
-		sum_hypothesis_trace = new Array3D<double>(byte_length, NUM_GUESSES, num_points);
+		sum_hypothesis_trace = new Array3D<RESULT_T>(byte_length, NUM_GUESSES, num_points);
 
 	};
 
-	py::array_t<double> calculate_correlation(py::array_t<double> &py_traces,
+	py::array_t<RESULT_T> calculate_correlation(py::array_t<TRACE_T> &py_traces,
 								py::array_t<uint8_t> &py_plaintext,
 								py::array_t<uint8_t> &py_ciphertext,
 								py::array_t<uint8_t> &py_knownkey);
@@ -60,7 +62,7 @@ protected:
 	int total_traces;
 	AESLeakageModel::ModelBase *model;
 
-	Array2D<double> *traces; // [0:num_traces][0:num_points]
+	Array2D<TRACE_T> *traces; // [0:num_traces][0:num_points]
 	uint8_t *plaintext; // [0:num_traces][0:byte_length]
 	uint8_t *ciphertext; // [0:num_traces][0:byte_length]
 	uint8_t *knownkey; // [0:num_traces][0:byte_length
@@ -74,15 +76,15 @@ protected:
 	Array2D<int64_t> *sum_hypothesis; // [0:byte_length][0:num_guesses]
 	Array2D<int64_t> *sum_hypothesis_square; // [0:byte_length][0:num_guesses]
 
-	Array3D<double> *sum_hypothesis_trace; // [0:byte_length][0:num_guesses][0:num_points]
+	Array3D<RESULT_T> *sum_hypothesis_trace; // [0:byte_length][0:num_guesses][0:num_points]
 
 	virtual void update_sum_trace();
 	virtual void calclualte_sumden2(QUADFLOAT *sumden2);
 	virtual void calculate_hypothesis();
-	virtual void calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2);
+	virtual void calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2);
 
 
-	virtual void setup_arrays(py::array_t<double> &py_traces,
+	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey);

@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:58
-*    Last Modified: 02-02-2024 15:46:02
+*    Last Modified: 17-02-2024 22:08:22
 */
 
 #ifndef FASTCPAOPENCL_H
@@ -88,11 +88,11 @@ public:
 protected:
 
 	// overrided functions
-	virtual void setup_arrays(py::array_t<double> &py_traces,
+	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey);
-	virtual void calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2);
+	virtual void calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2);
 
 private:
 	bool is_double_available(cl_device_id device_id);

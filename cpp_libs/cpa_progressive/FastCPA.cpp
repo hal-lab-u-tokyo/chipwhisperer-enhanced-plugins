@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 29-01-2024 22:47:46
+*    Last Modified: 21-02-2024 13:35:34
 */
 
 
@@ -27,7 +27,7 @@
 namespace py = pybind11;
 using namespace std;
 
-py::array_t<double> FastCPA::calculate_correlation(py::array_t<double> &py_traces,
+py::array_t<RESULT_T> FastCPA::calculate_correlation(py::array_t<TRACE_T> &py_traces,
 											py::array_t<uint8_t> &py_plaintext,
 											py::array_t<uint8_t> &py_ciphertext,
 											py::array_t<uint8_t> &py_knownkey)
@@ -42,8 +42,8 @@ py::array_t<double> FastCPA::calculate_correlation(py::array_t<double> &py_trace
 
 	calculate_hypothesis();
 
-	py::array_t<double> py_diff({byte_length, NUM_GUESSES, num_points});
-	Array3D<double>* diff = new Array3D<double>((double*)py_diff.request().ptr,
+	py::array_t<RESULT_T> py_diff({byte_length, NUM_GUESSES, num_points});
+	Array3D<RESULT_T>* diff = new Array3D<RESULT_T>((RESULT_T*)py_diff.request().ptr,
 											byte_length, NUM_GUESSES, num_points);
 	calculate_correlation_subkey(diff, sumden2);
 
@@ -52,7 +52,7 @@ py::array_t<double> FastCPA::calculate_correlation(py::array_t<double> &py_trace
 	return py_diff;
 }
 
-void FastCPA::setup_arrays(py::array_t<double> &py_traces,
+void FastCPA::setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey) {
@@ -68,7 +68,7 @@ void FastCPA::setup_arrays(py::array_t<double> &py_traces,
 	}
 
 	// get pointer
-	traces = new Array2D<double>((double*)py_traces.request().ptr,
+	traces = new Array2D<TRACE_T>((TRACE_T*)py_traces.request().ptr,
 										num_traces, num_points);
 
 	// verify shape
@@ -104,7 +104,9 @@ void FastCPA::calclualte_sumden2(QUADFLOAT *sumden2) {
 	#pragma omp parallel for
 	#endif
 	for (int p = 0; p < num_points; p++) {
-		sumden2[p] = SQUARE(sum_trace[p]) - (QUADFLOAT)total_traces * sum_trace_square[p];
+		// sumden2[p] = SQUARE(sum_trace[p]) - (QUADFLOAT)total_traces * sum_trace_square[p];
+		sumden2[p] = std::fma(- (QUADFLOAT)total_traces, sum_trace_square[p], SQUARE(sum_trace[p]));
+
 	}
 }
 
@@ -133,7 +135,7 @@ void FastCPA::calculate_hypothesis() {
 }
 
 
-void FastCPA::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2) {
+void FastCPA::calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2) {
 
 	QUADFLOAT sumden1;
 	// loop for each byte
@@ -162,7 +164,7 @@ void FastCPA::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sum
 				QUADFLOAT sumnum = (QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
 					- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
 
-				diff->at(byte_index, guess, p) = (double)sumnum / std::sqrt((double)sumden1 * (double)sumden2[p]);
+				diff->at(byte_index, guess, p) = (RESULT_T)sumnum / std::sqrt((RESULT_T)sumden1 * (RESULT_T)sumden2[p]);
 			}
 		}
 	}

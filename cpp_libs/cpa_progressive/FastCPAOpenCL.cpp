@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:30
-*    Last Modified: 02-02-2024 16:52:31
+*    Last Modified: 17-02-2024 22:08:04
 */
 
 
@@ -279,7 +279,7 @@ FastCPAOpenCL::FastCPAOpenCL(int num_traces, int num_points, AESLeakageModel::Mo
 }
 
 
-void FastCPAOpenCL::setup_arrays(py::array_t<double> &py_traces,
+void FastCPAOpenCL::setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey) {
@@ -320,7 +320,7 @@ void FastCPAOpenCL::setup_arrays(py::array_t<double> &py_traces,
 }
 
 
-void FastCPAOpenCL::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2) {
+void FastCPAOpenCL::calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2) {
 
 
 	// offload to GPU for sum_hypothesis, sum_hypothesis_square
@@ -337,7 +337,7 @@ void FastCPAOpenCL::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOA
 					(int64_t*)sum_hypothesis_square->get_pointer(),
 					sum_hypothesis_square->get_size());
 	COPY_FROM_DEVICE(cl_device_sum_hypothesis_trace,
-					(double*)sum_hypothesis_trace->get_pointer(),
+					(RESULT_T*)sum_hypothesis_trace->get_pointer(),
 					sum_hypothesis_trace->get_size());
 	clFinish(command_queue);
 
@@ -356,7 +356,7 @@ void FastCPAOpenCL::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOA
 				sumnum =
 					(QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
 					- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
-				diff->at(byte_index, guess, p) = (double)sumnum / std::sqrt((double)sumden1 * (double)sumden2[p]);
+				diff->at(byte_index, guess, p) = (RESULT_T)sumnum / std::sqrt((RESULT_T)sumden1 * (RESULT_T)sumden2[p]);
 			}
 		}
 	}

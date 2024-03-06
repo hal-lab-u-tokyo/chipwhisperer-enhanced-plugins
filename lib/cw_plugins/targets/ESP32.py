@@ -13,7 +13,6 @@ class ESP32Control:
 
     def __init__(self, ser) -> None:
         self.ser = ser
-        print("reset buffer")
         self.ser.reset_input_buffer()
 
     def flush(self):

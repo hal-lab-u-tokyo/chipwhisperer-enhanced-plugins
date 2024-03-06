@@ -1,5 +1,5 @@
 
-from sca_tools.scopes.base import ScopeBase,TriggerMode
+from cw_plugins.scopes.base import ScopeBase,TriggerMode
 import time
 import numpy as np
 from pyvisa import VisaIOError

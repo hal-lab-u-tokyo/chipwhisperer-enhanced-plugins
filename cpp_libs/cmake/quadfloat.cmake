@@ -1,3 +1,15 @@
+# check the target cpu architecture
+message(STATUS "Target CPU Architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+# check if defined CWEP_USE_BINARY128 variable
+if (NOT DEFINED CWEP_USE_BINARY128)
+	set(CWEP_USE_BINARY128 FALSE)
+endif()
+
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" AND CWEP_USE_BINARY128)
+	# add g++ flags for quad-precision floating point
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mlong-double-128")
+endif()
+
 
 set(SOURCE_CODE
 "#include <iostream>\n#include <climits>\nint main() {\nstd::cout << (CHAR_BIT * sizeof(long double)) << std::endl;\nreturn 0;\n}\n"

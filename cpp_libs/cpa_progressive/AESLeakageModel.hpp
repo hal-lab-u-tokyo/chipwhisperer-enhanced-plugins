@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:04
-*    Last Modified: 30-01-2024 12:31:14
+*    Last Modified: 19-02-2024 20:49:33
 */
 
 
@@ -124,6 +124,15 @@ namespace AESLeakageModel {
 
 		int leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index);
 	};
+
+	// class SBoxOutputSuccessive : public ModelBase
+	// {
+	// public:
+	// 	SBoxOutputSuccessive() : ModelBase() {};
+	// 	~SBoxOutputSuccessive() {};
+
+	// 	int leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index);
+	// };
 
 }
 

@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:39
-*    Last Modified: 30-01-2024 21:00:41
+*    Last Modified: 17-02-2024 22:10:12
 */
 
 
@@ -77,7 +77,7 @@ FastCPAOpenCLFP32::~FastCPAOpenCLFP32() {
 
 
 
-void FastCPAOpenCLFP32::setup_arrays(py::array_t<double> &py_traces,
+void FastCPAOpenCLFP32::setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey) {
@@ -128,7 +128,7 @@ void FastCPAOpenCLFP32::setup_arrays(py::array_t<double> &py_traces,
 }
 
 
-void FastCPAOpenCLFP32::calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2) {
+void FastCPAOpenCLFP32::calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2) {
 
 
 	// offload to GPU for sum_hypothesis, sum_hypothesis_square
@@ -151,7 +151,7 @@ void FastCPAOpenCLFP32::calculate_correlation_subkey(Array3D<double>* diff, QUAD
 					sum_hypothesis_trace->get_size());
 	clFinish(command_queue);
 
-	float2_to_double((cl_float2*)sum_hypothesis_trace_df64->get_pointer(), (double*)sum_hypothesis_trace->get_pointer(), byte_length * NUM_GUESSES * num_points);
+	float2_to_double((cl_float2*)sum_hypothesis_trace_df64->get_pointer(), (RESULT_T*)sum_hypothesis_trace->get_pointer(), byte_length * NUM_GUESSES * num_points);
 
 	#ifdef _OPENMP
 	#pragma omp parallel for collapse(2)
@@ -168,7 +168,7 @@ void FastCPAOpenCLFP32::calculate_correlation_subkey(Array3D<double>* diff, QUAD
 				sumnum =
 					(QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
 					- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
-				diff->at(byte_index, guess, p) = (double)sumnum / std::sqrt((double)sumden1 * (double)sumden2[p]);
+				diff->at(byte_index, guess, p) = (RESULT_T)sumnum / std::sqrt((RESULT_T)sumden1 * (RESULT_T)sumden2[p]);
 			}
 		}
 	}

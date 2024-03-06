@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  28-01-2024 03:41:03
-*    Last Modified: 29-01-2024 18:52:35
+*    Last Modified: 17-02-2024 22:10:29
 */
 
 
@@ -47,11 +47,11 @@ protected:
 	virtual const char** get_sum_hypothesis_trace_kernel_code() { return &sum_hypothesis_trace_kernel_code; }
 
 	// overrided functions
-	virtual void setup_arrays(py::array_t<double> &py_traces,
+	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey);
-	virtual void calculate_correlation_subkey(Array3D<double>* diff, QUADFLOAT *sumden2);
+	virtual void calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2);
 
 private:
 	Array2D<cl_float2> *traces_df64;

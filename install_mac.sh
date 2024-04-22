@@ -68,7 +68,7 @@ else
 	python3 -m venv $venv_path
 fi
 source $venv_path/bin/activate
-word_dir=`pwd`
+work_dir=`pwd`
 
 # clone chipwhisperer in temp directory
 echo "-- Cloning chipwhisperer."

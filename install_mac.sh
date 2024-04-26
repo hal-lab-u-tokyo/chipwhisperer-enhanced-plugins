@@ -61,7 +61,7 @@ fi
 if [ -d "$venv_path" ]; then
 	printf "The directory $venv_path already exists. Would you like to use existing environment? (y/n):"
 	read answer
-	if [ "$answer" != "${answer#[Yy]}" ] ;then
+	if [ "$answer" == "${answer#[Yy]}" ] ;then
 		exit 1;
 	fi
 else
@@ -81,12 +81,15 @@ pip3 install .
 pip3 install -r jupyter/requirements.txt
 rm -rf $temp_dir_name
 
+cd $work_dir
+
 if [ $NO_CPP_LIB -eq 0 ]; then
 	echo "-- Installing pybind11."
 	pip3 install pybind11
 fi
 
-cd $work_dir
+echo "-- Updating pip, setuptools and wheel."
+pip3 install --upgrade pip setuptools wheel
 
 echo "-- Installing chipwhisperer-enhanced-plugins."
 pip3 install . -v

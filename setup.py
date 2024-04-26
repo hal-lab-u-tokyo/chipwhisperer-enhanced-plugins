@@ -6,22 +6,28 @@ import_name = "cw_plugins"
 
 try:
     import pybind11
-except ImportError:
+except ImportError as e:
     ext_modules = []
     class CMakeBuild:
-        def __init__(self, *args, **kwargs):
-            pass
+        def __init__(self, *args):
+            super().__init__(*args)
+            raise RuntimeError("pybind11 is required to build the C++ extension.")
+
         def run(self):
             raise RuntimeError("pybind11 is required to build the C++ extension.")
 else:
     from setuptools.command.build_ext import build_ext
+
     class CMakeExtension(Extension):
         def __init__(self, name, cmake_src_dir):
             super().__init__(name, sources=[])
             self.cmake_src_dir = os.path.abspath(cmake_src_dir)
 
-
     class CMakeBuild(build_ext):
+
+        def __init__(self, *args):
+            super().__init__(*args)
+
         def run(self):
             # check if build directory exists
             if not os.path.exists(self.build_temp):
@@ -65,6 +71,7 @@ setup(
         "pycryptodome>=3.19.0",
         "matplotlib>=3.8.0",
         "numpy>=1.25.0",
+        "ipyfilechooser",
     ],
 
     packages=find_packages(where='lib',exclude=['notebooks']),

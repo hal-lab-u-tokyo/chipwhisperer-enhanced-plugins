@@ -3,7 +3,7 @@ This repository contains enhanced plugins for Chipwhisperer.
 The plugins are designed to be used with the Chipwhisperer platform.
 
 ## Extended features
-* Target devices
+* Target devices (See [hardware](docs/hardware.md) for details)
   * SAKURA-X board
   * ESP32
 * Capture devices

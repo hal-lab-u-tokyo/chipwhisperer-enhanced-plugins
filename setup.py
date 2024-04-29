@@ -67,7 +67,6 @@ setup(
     install_requires=[
         "PyUSB>=1.2.1",
         "pyvisa>=1.13.0",
-        "ftd2xx>=1.3.3",
         "pycryptodome>=3.19.0",
         "matplotlib>=3.8.0",
         "numpy>=1.25.0",

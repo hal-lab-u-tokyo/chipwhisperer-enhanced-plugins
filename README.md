@@ -29,11 +29,18 @@ The plugins are designed to be used with the Chipwhisperer platform.
 ### Capturing traces
 See [Setup](docs/setup.md)
 ### Analysis
-Recommended to use the Docker image with docmer-compose.
+It is recommended that the Docker image be used with docmer-compose.
 
 See [docker](docs/docker.md)
 
 For MacOS users, [install_mac.sh](./install_mac.sh) is provided to install this repository and its dependencies.
+
+## Getting Started
+### Acquiring traces
+[acquire_traces](notebooks/acquire_traces.ipynb) is a sample notebook for acquiring traces using VISA compatible oscilloscopes.
+
+### Analysis with FastCPA
+[fastcpa_example](notebooks/fastcpa_example.ipynb) is a sample notebook for analyzing traces using FastCPA.
 
 ## Special Thanks to Those Who Assisted in this development
 * Masaki Morita

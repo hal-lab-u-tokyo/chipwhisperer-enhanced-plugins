@@ -1,10 +1,10 @@
+
 # Required Python Packages
 ```
 git clone https://github.com/newaetech/chipwhisperer.git
 cd chipwhisperer
 pip3 install .
 pip3 install -r jupyter/requirements.txt
-pip3 install ftd2xx
 ```
 
 # Install toolbox packages
@@ -46,18 +46,6 @@ sudo dkms autoinstall
 ## PyVISA-py
 ```
 pip3 install pyvisa-py
-```
-
-# FTD2XX Driver
-To communicate the SAKURA-X board, you need FTD2XX Driver.
-
-## Linux
-```
-wget https://ftdichip.com/wp-content/uploads/2022/07/libftd2xx-x86_64-1.4.27.tgz
-tar xvf libftd2xx-x86_64-1.4.27.tgz
-sudo cp release/build/libftd2xx.so.1.4.27 /usr/local/lib/
-cd /usr/local/lib/
-sudo ln -s libftd2xx.so.1.4.27 libftd2xx.so
 ```
 
 # Udev Rule files

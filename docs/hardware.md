@@ -14,3 +14,7 @@ The trigger signal is asserted when the encryption starts and deasserted when th
 
 To communicate with the ESP32, the UART-USB converter is required.
 
+## SAKURA-X Shell
+This is a template of SAKURA-X board for easy evaluation of your cryptographic module.
+For more information, please refer to its [repo](../hardware/sakura-x-shell).
+

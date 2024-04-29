@@ -4,7 +4,7 @@ import time
 from pyvisa import VisaIOError
 
 class TriggerMode(Enum):
-    EDGE_RASE = 0
+    EDGE_RISE = 0
     EDGE_FALL = 1
     EDGE_ANY = 2
 

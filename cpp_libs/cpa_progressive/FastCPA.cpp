@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 21-02-2024 13:35:34
+*    Last Modified: 01-04-2024 16:31:15
 */
 
 
@@ -111,9 +111,9 @@ void FastCPA::calclualte_sumden2(QUADFLOAT *sumden2) {
 }
 
 void FastCPA::calculate_hypothesis() {
-	#ifdef _OPENMP
-	#pragma omp parallel for collapse(2)
-	#endif
+	// #ifdef _OPENMP
+	// #pragma omp parallel for collapse(2)
+	// #endif
 	// loop for each byte
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		// loop for each guess

@@ -1,3 +1,13 @@
+###
+#   Copyright (C) 2024 The University of Tokyo
+#   
+#   File:          /lib/cw_plugins/targets/ESP32.py
+#   Project:       sca_toolbox
+#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+#   Created Date:  27-03-2024 18:16:05
+#   Last Modified: 27-03-2024 18:16:09
+###
+
 from chipwhisperer.capture.targets._base import TargetTemplate
 from Crypto.Cipher import AES
 import numpy as np

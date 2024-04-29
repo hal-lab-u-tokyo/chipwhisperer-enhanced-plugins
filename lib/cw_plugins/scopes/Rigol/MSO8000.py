@@ -9,7 +9,7 @@ class MSO8000(ScopeBase):
         Rigol MSO8000 series oscilloscope class
     """
     slope_str = {
-        TriggerMode.EDGE_RASE: "POSitive",
+        TriggerMode.EDGE_RISE: "POSitive",
         TriggerMode.EDGE_FALL: "POSitive",
         TriggerMode.EDGE_ANY: "RFALl"
     }

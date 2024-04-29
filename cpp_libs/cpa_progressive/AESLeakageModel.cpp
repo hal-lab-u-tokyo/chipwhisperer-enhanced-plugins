@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:30:57
-*    Last Modified: 19-02-2024 20:49:35
+*    Last Modified: 01-04-2024 16:43:43
 */
 
 
@@ -34,17 +34,27 @@ int LastRoundStateDiff::leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, 
 	return (st10 ^ st9);
 }
 
-// int SBoxOutputSuccessive::leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index)
-// {
-// 	auto st1 = plaintext[byte_index] ^ key[byte_index];
-// 	int st2 = 0;
-// 	if (byte_index > 0) {
+int LastRoundStateDiffAlternate::leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index)
+{
+	auto st10 = ciphertext[byte_index];
+	auto st9 = inv_sbox(ciphertext[byte_index] ^ key[byte_index]);
+	return (st10 ^ st9);
+}
 
-// 	} else {
-		
-// 	}
-// 	// auto st2 = sbox(st1);
-// 	// auto st3 = st2 ^ key[byte_index];
-// 	// auto st4 = sbox(st3);
-// 	return st4;
-// }
+int LastRoundState::leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index)
+{
+	return inv_sbox(ciphertext[byte_index] ^ key[byte_index]);
+}
+
+int PlaintextKeyXOR::leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index)
+{
+	return plaintext[byte_index] ^ key[byte_index];
+}
+
+int PlaintextKeyXORDiff::leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index)
+{
+	auto sbox_in = plaintext[byte_index] ^ key[byte_index];
+	auto st1 = get_last_state(byte_index);
+	set_last_state(byte_index, ciphertext[byte_index]);
+	return st1 ^ sbox_in;
+}

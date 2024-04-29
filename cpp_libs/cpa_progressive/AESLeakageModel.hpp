@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:04
-*    Last Modified: 19-02-2024 20:49:33
+*    Last Modified: 01-04-2024 16:43:33
 */
 
 
@@ -15,6 +15,11 @@
 #include <stdint.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <vector>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace py = pybind11;
 
@@ -125,14 +130,65 @@ namespace AESLeakageModel {
 		int leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index);
 	};
 
-	// class SBoxOutputSuccessive : public ModelBase
-	// {
-	// public:
-	// 	SBoxOutputSuccessive() : ModelBase() {};
-	// 	~SBoxOutputSuccessive() {};
+	class LastRoundStateDiffAlternate : public ModelBase
+	{
+	public:
+		LastRoundStateDiffAlternate() : ModelBase() {};
+		~LastRoundStateDiffAlternate() {};
 
-	// 	int leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index);
-	// };
+		int leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index);
+	};
+
+	class LastRoundState: public ModelBase
+	{
+	public:
+		LastRoundState() : ModelBase() {};
+		~LastRoundState() {};
+
+		int leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index);
+	};
+
+	class PlaintextKeyXOR : public ModelBase
+	{
+	public:
+		PlaintextKeyXOR() : ModelBase() {};
+		~PlaintextKeyXOR() {};
+
+		int leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index);
+	};
+
+	class PlaintextKeyXORDiff : public ModelBase
+	{
+	public:
+		PlaintextKeyXORDiff() : ModelBase() {
+			// get omp max threads
+			#ifdef _OPENMP
+			int max_threads = omp_get_max_threads();
+			#else
+			int max_threads = 1;
+			#endif
+			last_state.resize(16, std::vector<uint8_t>(max_threads, 0));
+		};
+		int leakage_impl(uint8_t * plaintext, uint8_t * ciphertext, uint8_t * key, int byte_index);
+	private:
+		std::vector<std::vector<uint8_t>> last_state;
+
+		int get_last_state(int byte_index) {
+			return last_state[byte_index][get_thread_id()];
+		}
+
+		void set_last_state(int byte_index, uint8_t value) {
+			last_state[byte_index][get_thread_id()] = value;
+		}
+
+		int get_thread_id() {
+			#ifdef _OPENMP
+			return omp_get_thread_num();
+			#else
+			return 0;
+			#endif
+		}
+	};
 
 }
 

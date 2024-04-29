@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:54
-*    Last Modified: 21-02-2024 13:40:02
+*    Last Modified: 12-03-2024 16:41:45
 */
 
 #ifndef FAST_CPA_H
@@ -22,12 +22,12 @@ namespace py = pybind11;
 
 #define SQUARE(x) ((x) * (x))
 
-// #ifdef SOFT_QUAD_PRECISION
-// #include <quadfloat.h>
-// using QUADFLOAT = QuadFloat::QF128;
-// #else
+#ifdef SOFT_QUAD_PRECISION
+#include <quadfloat.h>
+using QUADFLOAT = QuadFloat::QF128;
+#else
 using QUADFLOAT = long double;
-// #endif
+#endif
 using TRACE_T = double;
 using RESULT_T = double;
 

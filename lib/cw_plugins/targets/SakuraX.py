@@ -1,26 +1,28 @@
+###
+#   Copyright (C) 2024 The University of Tokyo
+#   
+#   File:          /lib/cw_plugins/targets/SakuraX.py
+#   Project:       sca_toolbox
+#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+#   Created Date:  27-03-2024 18:15:59
+#   Last Modified: 29-04-2024 19:06:44
+###
+
+
 from chipwhisperer.capture.targets._base import TargetTemplate
 from Crypto.Cipher import AES
 import numpy as np
 
-try:
-    import ftd2xx
-    ftd2xx_available = True
-except OSError:
-    ftd2xx_available = False
-
-import time
-
-DEVICE_NAME = "FT8P1RTUA"
+import serial
+from serial.serialutil import SerialException
 
 class SakuraXControl:
     KEY_ADDR = 0x100
     PLAINTEXT_ADDR = 0x140
     CIPHERTEXT_ADDR = 0x180
     KICK_ADDR = 0x2
-    def __init__(self, dev) -> None:
-        self.dev = dev
-        self.dev.setBaudRate(115200)
-        self.dev.setTimeouts(1000, 1000)
+    def __init__(self, ser) -> None:
+        self.ser : serial.Serial = ser
 
     def write_data(self, addr : int, data : bytes):
         # data must be 2 bytes
@@ -31,30 +33,28 @@ class SakuraXControl:
         b += addr_bytes
         # data
         b += data
-        self.dev.write(b)
+        self.ser.write(b)
 
     def read_data(self, addr : int):
         # cmd
         b = 0x00.to_bytes(1, "big")
         addr_bytes = addr.to_bytes(2, "big")
         b += addr_bytes
-        self.dev.write(b)
-        ret = self.dev.read(2)
+        self.ser.write(b)
+        ret = self.ser.read(2)
         if len(ret) < 2:
             raise Exception("Timeout Error")
         return ret
 
     def flush(self):
-        # wait until rx buffer is empty
-        while self.dev.getQueueStatus()[0] != 0:
-            time.usleep(100)
+        self.ser.flush()
 
     def reset(self):
-        self.dev.resetDevice()
-        self.dev.purge(3) # purge rx(0x1) and tx(0x2) buffer
+        self.ser.reset_input_buffer()
+        self.ser.reset_output_buffer()
 
     def close(self):
-        self.dev.close()
+        self.ser.close()
 
     def send_key(self, key : bytes):
         for i in range(len(key) // 2):
@@ -78,8 +78,7 @@ class SakuraX(TargetTemplate):
     _name = 'Sakura-X'
     def __init__(self):
         super().__init__()
-        if not ftd2xx_available:
-            raise RuntimeError("ftd2xx is not available")
+        self.ser = None
         self.connectStatus = False
         self.ctrl = None
         self.scope = None
@@ -90,14 +89,16 @@ class SakuraX(TargetTemplate):
         return self._name
 
     # implimentation of con method
-    def _con(self, scope):
+    def _con(self, scope, serial_port = None, baud = 115200):
         """Connect to SAKURA-X Controller"""
+        if serial_port is None:
+            serial_port = "/dev/ttyUSB0"
         try:
-            dev_list = [dev.decode("utf-8") for dev in ftd2xx.listDevices()]
-            idx = dev_list.index(DEVICE_NAME)
-        except (ValueError,TypeError):
-            raise RuntimeError("SAKURA-X Controller not found")
-        self.ctrl = SakuraXControl(ftd2xx.open(idx))
+            self.ser = serial.Serial(serial_port, baud, timeout=1)
+        except SerialException as E:
+            raise RuntimeError(E.args)
+
+        self.ctrl = SakuraXControl(self.ser)
 
         self.scope = scope
 

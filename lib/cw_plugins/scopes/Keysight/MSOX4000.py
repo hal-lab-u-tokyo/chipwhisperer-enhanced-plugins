@@ -14,7 +14,7 @@ class MSOX4000(ScopeBase):
         "MSO-X 4104A": (5e9, 4, 4e6)
     }
     slope_str = {
-        TriggerMode.EDGE_RASE: "POSitive",
+        TriggerMode.EDGE_RISE: "POSitive",
         TriggerMode.EDGE_FALL: "NEGative",
         TriggerMode.EDGE_ANY: "EITHer"
     }

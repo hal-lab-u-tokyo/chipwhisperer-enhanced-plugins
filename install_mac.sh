@@ -22,6 +22,23 @@ if test ! $(which xcode-select 2> /dev/null); then
 	fi
 fi
 
+
+# check if brew is installed
+NO_BREW=0
+echo "-- Checking if homebrew is installed."
+if test ! $(which brew 2> /dev/null); then
+	printf "homebrew is need to install OpenMP.\nWould you like to proceed without installing homebrew? (y/n):"
+	read answer
+	if [ "$answer" != "${answer#[Yy]}" ] ;then
+		echo "Proceeding without homebrew."
+		NO_BREW=1
+	else
+		exit 1;
+	fi
+else
+	brew install libomp
+fi
+
 # check if cmake is installed
 echo "-- Checking if cmake is installed."
 if test ! $(which cmake 2> /dev/null); then
@@ -31,22 +48,20 @@ if test ! $(which cmake 2> /dev/null); then
 		echo "Proceeding without cmake."
 		NO_CPP_LIB=1
 	else
-		exit 1;
+		if [ $NO_BREW -eq 0 ]; then
+			printf "Would you like to install cmake? (y/n):"
+			read answer
+			if [ "$answer" == "${answer#[Yy]}" ] ;then
+				brew install cmake
+			else
+				echo "Quitting installation."
+				exit 1;
+			fi
+		else
+			echo "Fatal: cmake is essential to build C++ acceleration libraries."
+			exit 1;
+		fi
 	fi
-fi
-
-# check if brew is installed
-echo "-- Checking if homebrew is installed."
-if test ! $(which brew 2> /dev/null); then
-	printf "homebrew is need to install OpenMP.\nWould you like to proceed without installing homebrew? (y/n):"
-	read answer
-	if [ "$answer" != "${answer#[Yy]}" ] ;then
-		echo "Proceeding without homebrew."
-	else
-		exit 1;
-	fi
-else
-	brew install libomp
 fi
 
 # prepare venv

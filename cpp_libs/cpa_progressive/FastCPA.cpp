@@ -1,11 +1,11 @@
 /*
 *    Copyright (C) 2024 The University of Tokyo
 *    
-*    File:          /cpp_libs/cpa_progressive/FastCPA.cpp
+*    File:          /Downloads/sca_toolbox/cpp_libs/cpa_progressive/FastCPA.cpp
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 01-04-2024 16:31:15
+*    Last Modified: 05-05-2024 19:28:49
 */
 
 
@@ -104,8 +104,11 @@ void FastCPA::calclualte_sumden2(QUADFLOAT *sumden2) {
 	#pragma omp parallel for
 	#endif
 	for (int p = 0; p < num_points; p++) {
-		// sumden2[p] = SQUARE(sum_trace[p]) - (QUADFLOAT)total_traces * sum_trace_square[p];
+#ifdef SOFT_QUAD_PRECISION
+		sumden2[p] = SQUARE(sum_trace[p]) - (QUADFLOAT)total_traces * sum_trace_square[p];
+#else
 		sumden2[p] = std::fma(- (QUADFLOAT)total_traces, sum_trace_square[p], SQUARE(sum_trace[p]));
+#endif
 
 	}
 }

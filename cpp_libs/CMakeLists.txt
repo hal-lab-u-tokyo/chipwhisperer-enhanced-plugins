@@ -1,11 +1,11 @@
 #
 #    Copyright (C) 2024 The University of Tokyo
 #    
-#    File:          /cpp_libs/CMakeLists.txt
+#    File:          /Downloads/sca_toolbox/cpp_libs/CMakeLists.txt
 #    Project:       tkojima
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  16-01-2024 21:01:52
-#    Last Modified: 01-03-2024 18:06:01
+#    Last Modified: 05-05-2024 19:30:06
 #
 
 cmake_minimum_required(VERSION 3.20)
@@ -16,6 +16,13 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
 # add include directory globally
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# build type and optimization flags
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 # find the pybind11 package for giving hints
 execute_process(

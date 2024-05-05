@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:30
-*    Last Modified: 17-02-2024 22:08:04
+*    Last Modified: 05-05-2024 19:56:26
 */
 
 
@@ -130,12 +130,12 @@ cl_device_id FastCPAOpenCLBase::get_target_device(cl_platform_id platform)
 	cl_device_id target_device;
 	cl_uint deviceCount;
 	// get device count
-	vector<cl_device_id> devices(deviceCount);
 	err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &deviceCount);
 	if (err != CL_SUCCESS) {
 		throw runtime_error("Error: Failed to get device count ("
 							+ to_string(err) + ")");
 	}
+	vector<cl_device_id> devices(deviceCount);
 
 	err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices.data(), nullptr);
 	if (err != CL_SUCCESS) {

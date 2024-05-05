@@ -42,6 +42,13 @@ For MacOS users, [install_mac.sh](./install_mac.sh) is provided to install this 
 ### Analysis with FastCPA
 [fastcpa_example](notebooks/fastcpa_example.ipynb) is a sample notebook for analyzing traces using FastCPA.
 
+#### OpenCL device selection
+If you have multiple OpenCL devices, you can specify the device to use by setting the `CL_PLATFORM` and `CL_DEVICE` environment variables.
+
+# Known Issues
+The OpenCL implementation of FastCPA in Apple Silicon GPUs may provide incorrect results when a large number of traces and a long waveform are used.
+In this case, the update interval should be set to a smaller value.
+
 ## Special Thanks to Those Who Assisted in this development
 * Masaki Morita
 * Youhyun Kim

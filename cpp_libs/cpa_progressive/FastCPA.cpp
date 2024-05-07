@@ -1,11 +1,11 @@
 /*
 *    Copyright (C) 2024 The University of Tokyo
 *    
-*    File:          /Downloads/sca_toolbox/cpp_libs/cpa_progressive/FastCPA.cpp
+*    File:          /cpp_libs/cpa_progressive/FastCPA.cpp
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 05-05-2024 19:28:49
+*    Last Modified: 07-05-2024 12:00:11
 */
 
 
@@ -114,9 +114,9 @@ void FastCPA::calclualte_sumden2(QUADFLOAT *sumden2) {
 }
 
 void FastCPA::calculate_hypothesis() {
-	// #ifdef _OPENMP
-	// #pragma omp parallel for collapse(2)
-	// #endif
+	#ifdef _OPENMP
+	#pragma omp parallel for collapse(2)
+	#endif
 	// loop for each byte
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		// loop for each guess
@@ -145,8 +145,8 @@ void FastCPA::calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *s
 	#ifdef _OPENMP
 	#pragma omp parallel for collapse(2) private(sumden1)
 	#endif
-	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
-		for (int guess = 0; guess < NUM_GUESSES; guess++) {
+	for (int guess = 0; guess < NUM_GUESSES; guess++) {
+		for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 			for (int t = 0; t < num_traces; t++) {
 				auto hyp = hypothetial_leakage->at(byte_index, guess, t);
 				sum_hypothesis->at(byte_index, guess) += hyp;

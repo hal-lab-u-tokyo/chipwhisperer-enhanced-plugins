@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  27-03-2024 18:16:05
-#   Last Modified: 27-03-2024 18:16:09
+#   Last Modified: 13-07-2024 15:35:02
 ###
 
 from chipwhisperer.capture.targets._base import TargetTemplate
@@ -53,9 +53,6 @@ class ESP32Control:
         self.ser.write(buf)
         stat = self.ser.read(1)
         if stat[0] != 0:
-            print(stat)
-            print(self.read_ciphertext(16))
-            print()
             raise RuntimeError("Encryption failed")
 
     def read_ciphertext(self, byte_len : int = 8):

@@ -4,8 +4,10 @@ The plugins are designed to be used with the Chipwhisperer platform.
 
 ## Extended features
 * Target devices (See [hardware](docs/hardware.md) for details)
-  * SAKURA-X board
+  * SAKURA-X board configured with SASEBO-GIII sample
   * ESP32
+  * [SAKURA-X-SHELL](https://github.com/hal-lab-u-tokyo/sakura-x-shell)
+  * [VexRiscv_SakuraX](https://github.com/hal-lab-u-tokyo/VexRiscv_SakuraX)
 * Capture devices
   * Keysight Infiniviion 40000 (MSO-X 4101A tested)
   * Rigol MSO8000 (MSO8104 tested)
@@ -29,7 +31,7 @@ The plugins are designed to be used with the Chipwhisperer platform.
 ### Capturing traces
 See [Setup](docs/setup.md)
 ### Analysis
-It is recommended that the Docker image be used with docmer-compose.
+It is recommended that the Docker image be used with docker-compose.
 
 See [docker](docs/docker.md)
 

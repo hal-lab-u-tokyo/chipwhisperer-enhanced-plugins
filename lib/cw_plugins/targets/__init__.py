@@ -1,3 +1,5 @@
 from .SakuraX import SakuraX
-from .SakuraXShell import SakuraXShellControlBase, SakuraXShellBase, SakuraXShellExampleAES128BitRTL, SakuraXShellExampleAES128BitHLS
+from .SakuraShellAESExamples import SakuraXShellExampleAES128BitRTL, SakuraXShellExampleAES128BitHLS
+from .SakuraXVexRISCV import SakuraXVexRISCVControlBase
+from .SakuraXVexRISCVAESExample import SakuraXVexRISCVAESExample
 from .ESP32 import ESP32

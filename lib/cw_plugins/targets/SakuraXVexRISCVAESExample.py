@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  15-07-2024 19:24:25
-#   Last Modified: 15-07-2024 19:38:10
+#   Last Modified: 21-07-2024 20:38:05
 ###
 
 
@@ -14,7 +14,8 @@ from .SakuraXVexRISCV import SakuraXVexRISCVControlBase
 
 import os
 
-AES_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/aes.elf")
+UNMASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/aes_unmasked.elf")
+MASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/aes_masked.elf")
 
 class SakuraXVexRISCVControlAES128bit(SakuraXVexRISCVControlBase):
     CMD_SET_KEY 		= 0x11
@@ -22,6 +23,14 @@ class SakuraXVexRISCVControlAES128bit(SakuraXVexRISCVControlBase):
     CMD_ENCRYPT			= 0x13
     CMD_GET_CIPHERTEXT	= 0x14
     CMD_GET_DEBUG		= 0x15
+
+    def __init__(self, ser, masked = False, **kwargs):
+        if masked:
+            program = MASKED_PROGRAM
+        else:
+            program = UNMASKED_PROGRAM
+        super().__init__(ser, program, **kwargs)
+
 
     def send_key(self, key : bytes):
         buf = b""
@@ -55,7 +64,7 @@ class SakuraXVexRISCVControlAES128bit(SakuraXVexRISCVControlBase):
 
 class SakuraXVexRISCVAESExample(SakuraXShellAES):
     def getControl(self, **kwargs) -> SakuraXVexRISCVControlAES128bit:
-        return SakuraXVexRISCVControlAES128bit(self.ser, program=AES_PROGRAM, **kwargs)
+        return SakuraXVexRISCVControlAES128bit(self.ser, **kwargs)
 
     def getName(self):
         return "Sakura-X VexRISCV AES Example"

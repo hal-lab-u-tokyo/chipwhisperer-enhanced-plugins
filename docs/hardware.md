@@ -115,8 +115,11 @@ The following methods are available to check buffer status
 
 ### AES example
 
-This repository includes software implementation of AES-128 encryption for VexRiscv.
+This repository includes software implementations of AES-128 encryption for VexRiscv.
 [`SakuraXVexRISCVAESExample`](../lib//cw_plugins/targets/SakuraXVexRISCVAESExample.py) is a derived class of `SakuraXShellBase`.
+There are two implementations of AES-128 encryption in the repository, one is unmasked and the other is masked.
+`SakuraXVexRISCVAESExample` uses the unmasked implementation as default.
+To use the masked implementation, please set keyword argument `masked` to `True` for `con` method.
 
 The pin 1 of CN8 is used for the trigger signal, similar to SASEBO-GIII sample.
 

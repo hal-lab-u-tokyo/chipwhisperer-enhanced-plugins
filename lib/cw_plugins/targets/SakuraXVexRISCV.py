@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  13-07-2024 16:20:31
-#   Last Modified: 15-07-2024 19:24:36
+#   Last Modified: 17-07-2024 22:23:47
 ###
 
 from .SakuraXShell import SakuraXShellControlBase
@@ -27,7 +27,7 @@ class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
 
     def __init__(self, ser, program, control_address=0x4000_0000, verbose = False):
         super().__init__(ser)
-        self.debug_print = lambda x: print(x) if verbose else lambda x: None
+        self.debug_print = lambda x: print("[INFO]", x) if verbose else lambda x: None
         # system reset
         self.reset_command()
         self.segments = []

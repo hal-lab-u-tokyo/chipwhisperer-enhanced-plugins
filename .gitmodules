@@ -1,3 +1,6 @@
 [submodule "hardware/sakura-x-shell"]
 	path = hardware/sakura-x-shell
 	url = https://github.com/hal-lab-u-tokyo/sakura-x-shell.git
+[submodule "hardware/cw305-shell"]
+	path = hardware/cw305-shell
+	url = https://github.com/hal-lab-u-tokyo/cw305-shell

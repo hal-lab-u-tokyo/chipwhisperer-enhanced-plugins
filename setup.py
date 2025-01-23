@@ -71,6 +71,7 @@ setup(
         "matplotlib>=3.8.0",
         "numpy>=1.25.0",
         "ipyfilechooser",
+        "pyelftools"
     ],
 
     packages=find_packages(where='lib',exclude=['notebooks']),

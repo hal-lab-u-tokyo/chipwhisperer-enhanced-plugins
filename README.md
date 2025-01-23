@@ -6,8 +6,9 @@ The plugins are designed to be used with the Chipwhisperer platform.
 * Target devices (See [hardware](docs/hardware.md) for details)
   * SAKURA-X board configured with SASEBO-GIII sample
   * ESP32
-  * [SAKURA-X-SHELL](https://github.com/hal-lab-u-tokyo/sakura-x-shell)
+  * [SAKURA-X shell](https://github.com/hal-lab-u-tokyo/sakura-x-shell)
   * [VexRiscv_SakuraX](https://github.com/hal-lab-u-tokyo/VexRiscv_SakuraX)
+  * [CW305-shell](https://github.com/hal-lab-u-tokyo/cw305-shell)
 * Capture devices
   * Keysight Infiniviion 40000 (MSO-X 4101A tested)
   * Rigol MSO8000 (MSO8104 tested)

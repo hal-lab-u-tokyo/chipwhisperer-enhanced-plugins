@@ -123,6 +123,14 @@ To use the masked implementation, please set keyword argument `masked` to `True`
 
 The pin 1 of CN8 is used for the trigger signal, similar to SASEBO-GIII sample.
 
+## CW305Shell
+Similar to the SAKURA-X Shell, the CW305 Shell is a template for the CW305 board.
+The original CW305 class and its data communication have some limitations.
+A design based on our shell template and CW305Shell class provides ACK-based communication and more flexible data communication,
+allowing vairable latency data response from the FPGA, data bus clock domain crossing, and so on.
+For more information, please refer to its [repo](https://github.com/hal-lab-u-tokyo/cw305-shell).
+
+
 ## Code snippet for above examples without trace acquisition
 
 ```python

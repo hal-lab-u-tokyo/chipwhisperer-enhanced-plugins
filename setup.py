@@ -47,9 +47,9 @@ else:
                 build_dir = f"{self.build_temp}{os.sep}{ext.name}"
                 os.makedirs(build_dir, exist_ok=True)
                 # configure
-                subprocess.check_call(['cmake', ext.cmake_src_dir] + cmake_args, cwd=build_dir)
+                subprocess.check_call(['cmake3', ext.cmake_src_dir] + cmake_args, cwd=build_dir)
                 # build
-                subprocess.check_call(['cmake', '--build', '.'], cwd=build_dir)
+                subprocess.check_call(['cmake3', '--build', '.'], cwd=build_dir)
 
             if self.inplace:
                 self.copy_tree(self.build_lib, f"lib")
@@ -60,15 +60,36 @@ else:
     ]
 
 def post_process(installed_path):
+    print("Search for hwh files of example designs")
     # find hwh files for pre-built targets
     repo_path = Path(__file__).parent
 
     sakura_x_shell = repo_path / "hardware" / "sakura-x-shell" / "examples"
     hwh_files = glob.glob(str(sakura_x_shell / "**/*.hwh"), recursive=True)
+    copy_dst = installed_path / "targets" / "hwh_files" / "sakura-x"
+
+    if not copy_dst.exists():
+        print("create directory", copy_dst)
+        copy_dst.mkdir(parents=True)
     for hwh_file in hwh_files:
         p = Path(hwh_file)
         name = p.parent.stem
-        shutil.copy(hwh_file, installed_path / "cw_plugins" / "targets" / "hwh_files" / "sakura-x" / name + ".hwh")
+        shutil.copy(hwh_file, str(copy_dst) + "/" + name + ".hwh")
+        print("Adding", hwh_file, "to", copy_dst)
+
+    cw305_shell = repo_path / "hardware" / "cw305-shell" / "examples"
+
+    print("Search for soft implementation")
+    soft_path = repo_path / "lib" / "cw_plugins" / "targets" / "aes_soft"
+    if soft_path.exists():
+        print("copying soft implementation")
+        dst_path = installed_path / "targets" / "aes_soft"
+        if dst_path.exists():
+            print("remove", dst_path)
+            shutil.rmtree(dst_path)
+
+        print(soft_path, "->", dst_path)
+        shutil.copytree(soft_path, dst_path)
 
 
 class PostDevelopCommand(develop):
@@ -82,7 +103,8 @@ class PostInstallCommand(install):
     """Post-installation for installation mode."""
     def run(self):
         install.run(self)
-        post_process()
+        installed_path = Path(self.install_lib) / import_name
+        post_process(installed_path)
 
 setup(
     name=f'{import_name}',
@@ -107,7 +129,7 @@ setup(
     packages=find_packages(where='lib',exclude=['notebooks']),
     package_dir={'': 'lib'},
 
-    cmdclass={"build_ext": CMakeBuild},
+    cmdclass={"build_ext": CMakeBuild, "develop": PostDevelopCommand, "install": PostInstallCommand},
     ext_modules=ext_modules,
 
     scripts=[]

@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  15-07-2024 19:24:25
-#   Last Modified: 21-07-2024 20:38:05
+#   Last Modified: 23-07-2024 12:19:57
 ###
 
 
@@ -26,8 +26,10 @@ class SakuraXVexRISCVControlAES128bit(SakuraXVexRISCVControlBase):
 
     def __init__(self, ser, masked = False, **kwargs):
         if masked:
+            print("Masked AES program is selected")
             program = MASKED_PROGRAM
         else:
+            print("Unprotected AES program is selected")
             program = UNMASKED_PROGRAM
         super().__init__(ser, program, **kwargs)
 

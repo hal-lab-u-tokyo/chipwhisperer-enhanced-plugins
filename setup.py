@@ -1,6 +1,11 @@
 from setuptools import setup, find_packages, Extension
 import subprocess
 import os
+from setuptools.command.develop import develop
+from setuptools.command.install import install
+from pathlib import Path
+import glob
+import shutil
 
 import_name = "cw_plugins"
 
@@ -53,6 +58,31 @@ else:
     ext_modules = [
         CMakeExtension(f"{import_name}{os.sep}analyzer{os.sep}attacks", 'cpp_libs')
     ]
+
+def post_process(installed_path):
+    # find hwh files for pre-built targets
+    repo_path = Path(__file__).parent
+
+    sakura_x_shell = repo_path / "hardware" / "sakura-x-shell" / "examples"
+    hwh_files = glob.glob(str(sakura_x_shell / "**/*.hwh"), recursive=True)
+    for hwh_file in hwh_files:
+        p = Path(hwh_file)
+        name = p.parent.stem
+        shutil.copy(hwh_file, installed_path / "cw_plugins" / "targets" / "hwh_files" / "sakura-x" / name + ".hwh")
+
+
+class PostDevelopCommand(develop):
+    """Post-installation for development mode."""
+    def run(self):
+        develop.run(self)
+
+
+
+class PostInstallCommand(install):
+    """Post-installation for installation mode."""
+    def run(self):
+        install.run(self)
+        post_process()
 
 setup(
     name=f'{import_name}',

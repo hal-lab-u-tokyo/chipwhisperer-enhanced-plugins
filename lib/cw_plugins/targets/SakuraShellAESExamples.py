@@ -4,7 +4,7 @@
 #   File:          /lib/cw_plugins/targets/SakuraShellAESExamples.py
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)#   Created Date:  13-07-2024 15:38:26
-#   Last Modified: 25-01-2025 07:15:08
+#   Last Modified: 25-01-2025 15:21:48
 ###
 
 from .SakuraXShell import SakuraXShellBase, SakuraXShellControlBase
@@ -20,20 +20,13 @@ class SakuraXShellAES(SakuraXShellBase, metaclass=ABCMeta):
     def __init__(self, ):
         super().__init__()
         self.cipher = None
-        self.last_key = [0 for _ in range(16)]
-        self.key_size = 16
-        self.input_size = 16
-        self.output_size = 16
         self.input = bytes()
 
-    def getkeySize(self):
-        return self.key_size
+    def textLen(self):
+        return 16
 
-    def getInputSize(self):
-        return self.input_size
-
-    def getOutputSize(self):
-        return self.output_size
+    def keyLen(self):
+        return 16
 
     def getExpected(self):
         ct = self.cipher.encrypt(bytes(self.input))
@@ -41,14 +34,11 @@ class SakuraXShellAES(SakuraXShellBase, metaclass=ABCMeta):
         return ct
 
     def loadEncryptionKey(self, key):
-        self.key_size = len(key)
         self.ctrl.send_key(bytes(key))
         self.last_key = key
         self.cipher = AES.new(bytes(key), AES.MODE_ECB)
 
     def loadInput(self, inputtext):
-        self.input_size = len(inputtext)
-        self.output_size = len(inputtext)
         self.input = inputtext
         self.ctrl.send_plaintext(bytes(inputtext))
 

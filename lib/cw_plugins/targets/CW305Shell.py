@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  22-01-2025 08:34:28
-#   Last Modified: 24-01-2025 03:21:07
+#   Last Modified: 25-01-2025 15:12:12
 ###
 
 from pathlib import Path
@@ -17,8 +17,10 @@ import numpy as np
 
 from .utils import vivado_parse_memmap
 
+from abc import ABCMeta, abstractmethod
 
-class CW305Shell(CW305):
+
+class CW305ShellBase(CW305, metaclass=ABCMeta):
     # flit format constants
     FLIT_READ_ADDR_UPPER=0
     FLIT_READ_ADDR_LOWER=1
@@ -38,10 +40,12 @@ class CW305Shell(CW305):
         RED = 4
 
     def __init__(self):
-        super(CW305Shell, self).__init__()
+        super().__init__()
         self.bytecount_size = 0 # avoid address increment in base class implementation
         self.memmap = None
         self.timeout = 1
+        self.last_key = bytes()
+        self.key = bytes()
 
     def _con(self, scope=None, **kwargs):
         """Connect to the target FPGA
@@ -56,6 +60,7 @@ class CW305Shell(CW305):
             Please see the base class (CW305) for other arguments.
 
         """
+
         if "fpga_id" in kwargs:
             if kwargs["fpga_id"] != "100t":
                 raise ValueError("Currently only the 100t is supported")
@@ -77,7 +82,7 @@ class CW305Shell(CW305):
         if hwh_path.exists():
             self.memmap = vivado_parse_memmap(str(hwh_path), "/usb_interface_0")
 
-        super(CW305Shell, self)._con(**kwargs)
+        super()._con(**kwargs)
 
     def reset_interface(self):
         """Force reset the stuck state of the interface module"""
@@ -95,8 +100,7 @@ class CW305Shell(CW305):
         self.pll.pll_outenable_set(True, 1)
         self.pll.pll_outenable_set(False, 2)
         self.pll.pll_outfreq_set(100E6, 1)
-        self.reset_interface()
-        self.soft_reset()
+        self.reset()
 
     def __make_flit(self, type, payload, data_len = 0):
         """Helper function to make flit"""
@@ -118,7 +122,7 @@ class CW305Shell(CW305):
         try:
             while True:
                 resp = super().fpga_read(0x0, 1)[0]
-                if resp != CW305Shell.RESPONSE_NOT_READY:
+                if resp != CW305ShellBase.RESPONSE_NOT_READY:
                     return resp
                 await asyncio.sleep(0.01)
         except asyncio.CancelledError:
@@ -153,22 +157,22 @@ class CW305Shell(CW305):
         addr_upper = addr >> 16
         addr_lower = addr & 0xffff
         flits = []
-        flits.append(self.__make_flit(CW305Shell.FLIT_WRITE_ADDR_UPPER, addr_upper, len(data)-1))
-        flits.append(self.__make_flit(CW305Shell.FLIT_WRITE_ADDR_LOWER, addr_lower))
+        flits.append(self.__make_flit(CW305ShellBase.FLIT_WRITE_ADDR_UPPER, addr_upper, len(data)-1))
+        flits.append(self.__make_flit(CW305ShellBase.FLIT_WRITE_ADDR_LOWER, addr_lower))
         for d in data:
             data_upper = d >> 16
             if data_upper > 0xffff:
                 Warning("sending data exceeding 32-bit limit. It will be truncated")
             data_lower = d & 0xffff
-            flits.append(self.__make_flit(CW305Shell.FLIT_WRITE_DATA_UPPER, data_upper))
-            flits.append(self.__make_flit(CW305Shell.FLIT_WRITE_DATA_LOWER, data_lower))
+            flits.append(self.__make_flit(CW305ShellBase.FLIT_WRITE_DATA_UPPER, data_upper))
+            flits.append(self.__make_flit(CW305ShellBase.FLIT_WRITE_DATA_LOWER, data_lower))
         for flit in flits:
             addr = flit >> 8
             binary = flit & 0xff
             super().fpga_write(addr, [binary])
 
         resp = asyncio.run(asyncio.wait_for(self.__wait_until_not_ready(), timeout=self.timeout))
-        if resp != CW305Shell.RESPONSE_CMD_OK:
+        if resp != CW305ShellBase.RESPONSE_CMD_OK:
             if resp < 0:
                 msg = f"FPGA write timed out"
             else:
@@ -198,14 +202,14 @@ class CW305Shell(CW305):
         addr_upper = addr >> 16
         addr_lower = addr & 0xffff
         flits = []
-        flits.append(self.__make_flit(CW305Shell.FLIT_READ_ADDR_UPPER, addr_upper, data_len-1))
-        flits.append(self.__make_flit(CW305Shell.FLIT_READ_ADDR_LOWER, addr_lower))
+        flits.append(self.__make_flit(CW305ShellBase.FLIT_READ_ADDR_UPPER, addr_upper, data_len-1))
+        flits.append(self.__make_flit(CW305ShellBase.FLIT_READ_ADDR_LOWER, addr_lower))
         for flit in flits:
             addr = flit >> 8
             data = flit & 0xff
             super().fpga_write(addr, [data])
         resp = asyncio.run(asyncio.wait_for(self.__wait_until_not_ready(), timeout=self.timeout))
-        if resp != CW305Shell.RESPONSE_READY:
+        if resp != CW305ShellBase.RESPONSE_READY:
             if resp < 0:
                 msg = f"FPGA read timed out"
             else:
@@ -218,7 +222,7 @@ class CW305Shell(CW305):
         # decode as little endian
         data = np.frombuffer(binary_data, "<u4")
         resp = super().fpga_read(0x0, 1)[0]
-        if resp != CW305Shell.RESPONSE_CMD_OK:
+        if resp != CW305ShellBase.RESPONSE_CMD_OK:
             self.reset_interface()
             raise RuntimeError(f"unexpected response 0x{resp:02x}", data)
 
@@ -232,12 +236,12 @@ class CW305Shell(CW305):
             To reset the stuck state of the interface module, call reset_interface() instead.
 
         """
-        reset_cmd_flit = self.__make_flit(CW305Shell.FLIT_RESET, 0)
+        reset_cmd_flit = self.__make_flit(CW305ShellBase.FLIT_RESET, 0)
         addr = reset_cmd_flit >> 8
         data = reset_cmd_flit & 0xff
         super().fpga_write(addr, [data])
         resp = asyncio.run(asyncio.wait_for(self.__wait_until_not_ready(), timeout=self.timeout))
-        if resp != CW305Shell.RESPONSE_CMD_OK:
+        if resp != CW305ShellBase.RESPONSE_CMD_OK:
             if resp < 0:
                 msg = f"Soft reset timed out"
             else:
@@ -249,13 +253,13 @@ class CW305Shell(CW305):
         """Turn on onbaord LEDs
 
             Args:
-                led (int or CW305Shell.LED_COLOR): LED number or color)
+                led (int or CW305ShellBase.LED_COLOR): LED number or color)
 
                 If led is int, it is the LED number (0-2).
                     0: blue (rightmost)
                     1: green (center)
                     2: red (leftmost)
-                Anothe way is to use CW305Shell.LED_COLOR enum.
+                Anothe way is to use CW305ShellBase.LED_COLOR enum.
 
             Note:
                 This function does not change the state of other LEDs.
@@ -267,7 +271,7 @@ class CW305Shell(CW305):
 
         current_leds = self.fpga_read(self.memmap.axi_gpio.base + 8, 1) # see AMD DS744 datasheet
 
-        if isinstance(led, CW305Shell.LED_COLOR):
+        if isinstance(led, CW305ShellBase.LED_COLOR):
             led = led.value
         if led > 2 or led < 0:
             raise ValueError("LED number must be between 0 and 2")
@@ -284,7 +288,7 @@ class CW305Shell(CW305):
             raise RuntimeError("No memory map is not available. Load .hwh when connecting to the target")
 
         current_leds = self.fpga_read(self.memmap.axi_gpio.base + 8, 1)
-        if isinstance(led, CW305Shell.LED_COLOR):
+        if isinstance(led, CW305ShellBase.LED_COLOR):
             led = led.value
         if led > 2 or led < 0:
             raise ValueError("LED number must be between 0 and 2")
@@ -292,3 +296,70 @@ class CW305Shell(CW305):
         next_leds = current_leds & ~(1 << led)
 
         self.fpga_write(self.memmap.axi_gpio.base + 8, next_leds)
+
+    def reset(self):
+        self.reset_interface()
+        self.soft_reset()
+
+    def getName(self):
+        return "Base Class for CW305 Shell"
+
+    def isDone(self):
+        """Check if the target module has finished the encryption"""
+        return True
+
+    # Wrapper methods for compatibility with ChipWhisperer.capture_trace
+    def set_key(self, key, **kwargs):
+        """Set encryption key"""
+        self.key = key
+        if self.last_key != key:
+            self.loadEncryptionKey(key)
+
+
+    def simpleserial_read(self, cmd, pay_len, **kwargs):
+        """Read data from target"""
+        if cmd == "r":
+            return self.readOutput()
+        else:
+            raise ValueError("Unknown command {}".format(cmd))
+
+    def simpleserial_write(self, cmd, data, end=None):
+        if cmd == 'p':
+            self.loadInput(data)
+            self.go()
+        elif cmd == 'k':
+            self.loadEncryptionKey(data)
+        else:
+            raise ValueError("Unknown command {}".format(cmd))
+
+    def is_done(self):
+        return self.isDone()
+
+
+    # Abstract methods
+    @abstractmethod
+    def go(self):
+        pass
+
+    @abstractmethod
+    def getExpected(self):
+        """Return expected ciphertext.
+            If readed ciphertext is not equal to this value, the encryption is regarded as failed.
+        """
+        pass
+
+    @abstractmethod
+    def loadEncryptionKey(self, key):
+        """Load encryption key to the target module"""
+        pass
+
+    @abstractmethod
+    def loadInput(self, inputtext):
+        """Load input text to the target module"""
+        pass
+
+    @abstractmethod
+    def readOutput(self):
+        """Read ciphertext from the target module"""
+        pass
+

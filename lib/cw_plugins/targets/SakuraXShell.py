@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  27-03-2024 18:15:49
-#   Last Modified: 15-07-2024 19:52:28
+#   Last Modified: 25-01-2025 15:30:22
 ###
 
 from chipwhisperer.capture.targets._base import TargetTemplate
@@ -165,7 +165,8 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
         self.connectStatus = False
         self.ctrl = None
         self.scope = None
-
+        self.last_key = bytes()
+        self.key = bytes()
 
     def _con(self, scope, serial_port = None, baud = 115200, **kwargs):
         if serial_port is None:
@@ -189,7 +190,7 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
         self.ctrl.flush()
 
     def readOutput(self):
-        return np.frombuffer(self.ctrl.read_ciphertext(self.getOutputSize()),\
+        return np.frombuffer(self.ctrl.read_ciphertext(self.textLen()),\
                             dtype=np.uint8)
 
     def go(self):
@@ -199,22 +200,6 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
         return "Base Class for Sakura-X Shell"
 
     # Abstract methods
-
-    @abstractmethod
-    def getkeySize(self):
-        """Return key size in bytes"""
-        pass
-
-    @abstractmethod
-    def getInputSize(self):
-        """Return input size in bytes"""
-        pass
-
-    @abstractmethod
-    def getOutputSize(self):
-        """Return output size in bytes"""
-        pass
-
     @abstractmethod
     def getControl(self, **kwargs) -> SakuraXShellControlBase:
         """Derived class must implement this method to instantiate SakuraXShellControlBase derived class"""

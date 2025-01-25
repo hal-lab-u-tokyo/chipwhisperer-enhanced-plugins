@@ -80,6 +80,9 @@ def post_process(installed_path):
     cw305_shell = repo_path / "hardware" / "cw305-shell" / "examples"
     hwh_files = glob.glob(str(cw305_shell / "**/*.hwh"), recursive=True)
     copy_dst = installed_path / "targets" / "hwh_files" / "cw305"
+    if not copy_dst.exists():
+        print("create directory", copy_dst)
+        copy_dst.mkdir(parents=True)
     for hwh_file in hwh_files:
         p = Path(hwh_file)
         name = p.parent.stem

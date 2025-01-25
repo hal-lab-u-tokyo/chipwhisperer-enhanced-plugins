@@ -5,12 +5,14 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  25-01-2025 15:16:34
-#   Last Modified: 25-01-2025 15:22:12
+#   Last Modified: 25-01-2025 19:55:38
 ###
 
 
 from .CW305Shell import CW305ShellBase
 from Crypto.Cipher import AES
+
+from pathlib import Path
 
 import warnings
 
@@ -35,7 +37,7 @@ class CW305ShellAES128BitBase(CW305ShellBase):
     def textLen(self):
         return 16
 
-class CW305ShellAES128BitRTL(CW305ShellAES128BitBase):
+class CW305ShellExampleAES128BitRTL(CW305ShellAES128BitBase):
     class AIST_CORE():
         ADDRESS_MAP = {
             "key": 0x0,
@@ -60,13 +62,19 @@ class CW305ShellAES128BitRTL(CW305ShellAES128BitBase):
 
 
     def _con(self, scope=None, implementation="aist", **kwargs):
-        if "hwh_file" not in kwargs:
-            pass
+        name_base = "aes128_aist_rtl" if implementation == "aist" else "aes128_googlevault_rtl"
+
+        use_prebuilt_bitstream = False
+        if "bsfile" not in kwargs:
+            kwargs["bsfile"] = Path(__file__).parent / "bitstreams" / "cw305" / name_base + ".bit"
+            use_prebuilt_bitstream = True
+
+        if "hwh_file" not in kwargs and use_prebuilt_bitstream:
+            kwargs["hwh_file"] = Path(__file__).parent / "hwh_files" / "cw305" / name_base + ".hwh"
 
         super()._con(scope, **kwargs)
         try:
-            # self.address_base = self.memmap.aist_aes_core_0.base
-            self.address_base = self.memmap.googlevault_aes_core_0.base
+            self.address_base = self.memmap.aes_rtl_core_0.base
         except AttributeError:
             warnings.warn("Error loading hardware handoff file. Using default address map.")
             self.address_base = 0x8000_0000
@@ -100,8 +108,10 @@ class CW305ShellAES128BitRTL(CW305ShellAES128BitBase):
                             [self.AIST_CORE.PT_READY_BIT])
 
     def run_google_core(self):
-        self.fpga_write(self.address_base + self.GOOGLE_CORE.ADDRESS_MAP["control"], \
-                         [self.GOOGLE_CORE.ENC_START_BIT ])
+        # self.fpga_write(self.address_base + self.GOOGLE_CORE.ADDRESS_MAP["control"], \
+        #                  [self.GOOGLE_CORE.ENC_START_BIT ])
+        # use external trigger
+        self.usb_trigger_toggle()
 
     # implement abstract methods
     def go(self):
@@ -127,7 +137,7 @@ class CW305ShellAES128BitRTL(CW305ShellAES128BitBase):
 
         return ct
 
-class CW305ShellAES128BitHLS(CW305ShellAES128BitBase):
+class CW305ShellExampleAES128BitHLS(CW305ShellAES128BitBase):
     CTRL_ADDRESS_MAP = {
         "control": 0x0,
         "key_offset": 0x10,
@@ -152,13 +162,20 @@ class CW305ShellAES128BitHLS(CW305ShellAES128BitBase):
         print("setup done")
 
     def _con(self, scope=None, **kwargs):
-        if "hwh_file" not in kwargs:
-            pass
+
+        use_prebuilt_bitstream = False
+        if "bsfile" not in kwargs:
+            kwargs["bsfile"] = Path(__file__).parent / "bitstreams" / "cw305" / "aes128_hls.bit"
+            use_prebuilt_bitstream = True
+
+        if "hwh_file" not in kwargs and use_prebuilt_bitstream:
+            kwargs["hwh_file"] = Path(__file__).parent / "hwh_files" / "cw305" / "aes128_hls.hwh"
+
 
         super()._con(scope, **kwargs)
         try:
             self.core_address = self.memmap.AES128Encrypt_0.base
-            self.bram_address = self.memmap.axi_bram_ctrl_0.base
+            self.bram_address = self.memmap.axi_bram_ctrl_1.base
         except AttributeError:
             warnings.warn("Error loading hardware handoff file. Using default address map.")
             self.core_address = 0x8000_0000

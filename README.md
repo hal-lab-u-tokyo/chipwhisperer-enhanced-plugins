@@ -2,6 +2,12 @@
 This repository contains enhanced plugins for Chipwhisperer.
 The plugins are designed to be used with the Chipwhisperer platform.
 
+## Clone this repository
+This repository contains submodules. To clone this repository, use the following command:
+```
+git clone --recursive https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins
+```
+
 ## Extended features
 * Target devices (See [hardware](docs/hardware.md) for details)
   * SAKURA-X board configured with SASEBO-GIII sample

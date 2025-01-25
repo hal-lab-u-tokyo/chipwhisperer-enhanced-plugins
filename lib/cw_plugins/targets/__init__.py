@@ -3,6 +3,6 @@ from .SakuraShellAESExamples import SakuraXShellExampleAES128BitRTL, SakuraXShel
 from .SakuraXVexRISCV import SakuraXVexRISCVControlBase
 from .SakuraXVexRISCVAESExample import SakuraXVexRISCVAESExample
 from .CW305Shell import CW305ShellBase
-from .CW305ShellAESExamples import CW305ShellAES128BitRTL, CW305ShellAES128BitHLS
+from .CW305ShellAESExamples import CW305ShellExampleAES128BitRTL, CW305ShellExampleAES128BitHLS
 
 from .ESP32 import ESP32

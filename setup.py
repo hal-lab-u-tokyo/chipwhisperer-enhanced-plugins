@@ -78,6 +78,24 @@ def post_process(installed_path):
         print("Adding", hwh_file, "to", copy_dst)
 
     cw305_shell = repo_path / "hardware" / "cw305-shell" / "examples"
+    hwh_files = glob.glob(str(cw305_shell / "**/*.hwh"), recursive=True)
+    copy_dst = installed_path / "targets" / "hwh_files" / "cw305"
+    for hwh_file in hwh_files:
+        p = Path(hwh_file)
+        name = p.parent.stem
+        shutil.copy(hwh_file, str(copy_dst) + "/" + name + ".hwh")
+        print("Adding", hwh_file, "to", copy_dst)
+
+    bit_files = glob.glob(str(cw305_shell / "**/*.bit"), recursive=True)
+    copy_dst = installed_path / "targets" / "bitstreams" / "cw305"
+    if not copy_dst.exists():
+        print("create directory", copy_dst)
+        copy_dst.mkdir(parents=True)
+    for bit_file in bit_files:
+        p = Path(bit_file)
+        name = p.parent.stem
+        shutil.copy(bit_file, str(copy_dst) + "/" + name + ".bit")
+        print("Adding", bit_file, "to", copy_dst)
 
     print("Search for soft implementation")
     soft_path = repo_path / "lib" / "cw_plugins" / "targets" / "aes_soft"
@@ -96,7 +114,8 @@ class PostDevelopCommand(develop):
     """Post-installation for development mode."""
     def run(self):
         develop.run(self)
-
+        installed_path = Path(self.install_lib) / import_name
+        post_process(installed_path)
 
 
 class PostInstallCommand(install):

@@ -171,8 +171,10 @@ The pin 1 of CN8 is used for the trigger signal, similar to SASEBO-GIII sample.
 ```python
 import chipwhisperer as cw
 from cw_plugins.targets.ESP32 import ESP32 # <- ESP32 example
-from cw_plugins.targets import SakuraXShellExampleAES128BitRTL # <- for RTL design example
-from cw_plugins.targets import SakuraXShellExampleAES128BitHLS # <- for HLS design example
+from cw_plugins.targets import SakuraXShellExampleAES128BitRTL # <- for SAKRA-X with RTL design example
+from cw_plugins.targets import SakuraXShellExampleAES128BitHLS # <- for SAKRA-X with HLS design example
+from cw_plugins.targets import CW305ShellExampleAES128BitRTL # <- for CW305 with RTL design example
+from cw_plugins.targets import CW305ShellExampleAES128BitHLS # <- for CW305 with HLS design example
 from cw_plugins.targets import SakuraXVexRISCVAESExample # <- for VexRiscv with software AES example
 
 # instantiate the target hardware

@@ -5,11 +5,14 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  22-01-2025 08:34:28
-#   Last Modified: 25-01-2025 16:27:28
+#   Last Modified: 25-01-2025 20:52:22
 ###
 
 from pathlib import Path
 import asyncio
+import nest_asyncio
+nest_asyncio.apply()
+
 from enum import Enum
 
 from chipwhisperer.capture.targets import CW305
@@ -18,6 +21,8 @@ import numpy as np
 from .utils import vivado_parse_memmap
 
 from abc import ABCMeta, abstractmethod
+
+
 
 class CW305ShellBase(CW305, metaclass=ABCMeta):
     # flit format constants

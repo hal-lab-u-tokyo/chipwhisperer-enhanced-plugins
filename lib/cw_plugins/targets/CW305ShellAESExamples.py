@@ -5,12 +5,13 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  25-01-2025 15:16:34
-#   Last Modified: 25-01-2025 19:55:38
+#   Last Modified: 27-01-2025 15:07:41
 ###
 
 
 from .CW305Shell import CW305ShellBase
 from Crypto.Cipher import AES
+import numpy as np
 
 from pathlib import Path
 
@@ -135,7 +136,7 @@ class CW305ShellExampleAES128BitRTL(CW305ShellAES128BitBase):
         for w in ct_words:
             ct += int(w).to_bytes(4, byteorder='big')
 
-        return ct
+        return np.frombuffer(ct, dtype=np.uint8)
 
 class CW305ShellExampleAES128BitHLS(CW305ShellAES128BitBase):
     CTRL_ADDRESS_MAP = {
@@ -232,7 +233,7 @@ class CW305ShellExampleAES128BitHLS(CW305ShellAES128BitBase):
         for w in ct_words:
             ct += int(w).to_bytes(4, byteorder='little')
         self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["control"], [self.CTRL_AP_CONTINUE])
-        return ct
+        return np.frombuffer(ct, dtype=np.uint8)
 
 
     def isDone(self):

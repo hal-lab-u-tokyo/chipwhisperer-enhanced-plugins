@@ -145,7 +145,8 @@ setup(
         "matplotlib>=3.8.0",
         "numpy>=1.25.0",
         "ipyfilechooser",
-        "pyelftools"
+        "pyelftools",
+        "nest_asyncio",
     ],
 
     packages=find_packages(where='lib',exclude=['notebooks']),

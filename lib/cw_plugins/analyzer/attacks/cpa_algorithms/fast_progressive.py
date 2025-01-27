@@ -49,7 +49,11 @@ class FastCPAProgressive(AlgorithmsBase):
             trange = range(tstart, tend)
             part_trace = np.array([traceSource.get_trace(t + tracerange[0])[pointRange[0]:pointRange[1]] for t in trange])
             part_textin = np.array([traceSource.get_textin(t + tracerange[0]) for t in trange])
-            part_textout = np.array([traceSource.get_textout(t + tracerange[0]) for t in trange])
+            if type(traceSource.get_textout(0)) == bytes:
+                part_textout = np.array([np.frombuffer(traceSource.get_textout(t + tracerange[0]), dtype=np.uint8) for t in trange])
+            else:
+                part_textout = np.array([traceSource.get_textout(t + tracerange[0]) for t in trange])
+
             part_knownkey = np.array([traceSource.get_known_key(t + tracerange[0]) for t in trange])
 
             diff = cpa.calculate_correlation(part_trace, part_textin, part_textout, part_knownkey)

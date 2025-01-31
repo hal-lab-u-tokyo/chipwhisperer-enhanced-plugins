@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 06:33:19
-*    Last Modified: 31-01-2025 19:52:36
+*    Last Modified: 01-02-2025 05:24:48
 */
 
 
@@ -37,7 +37,7 @@ py::array_t<RESULT_T> SOCPABase::calculate_correlation(py::array_t<TRACE_T> &py_
 	total_traces += num_traces;
 	// auto end = chrono::system_clock::now();
 
-	// update_sum_trace();
+	update_sum_trace();
 
 	// Array2D<QUADFLOAT> *sumden2 = new Array2D<QUADFLOAT>(num_points, window_size);
 	// calclualte_sumden2(sumden2);
@@ -57,64 +57,75 @@ py::array_t<RESULT_T> SOCPABase::calculate_correlation(py::array_t<TRACE_T> &py_
 
 	#pragma omp parallel for collapse(2)
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
-		for (int p = 0; p < num_points; p++) {
-			QUADFLOAT s1 = 0, s6 = 0;
+		for (int guess = 0; guess < NUM_GUESSES; guess++) {
 			for (int t = 0; t < num_traces; t++) {
-				s1 += traces->at(t, p); // reusable for each byte index, replaceable with sum_trace
-				s6 += SQUARE(traces->at(t, p)); // reusable for each byte index, replaceable with sum_trace_square
+				auto hyp = hypothetial_leakage->at(byte_index, guess, t);
+				sum_hypothesis->at(byte_index, guess) += hyp;
+				sum_hypothesis_square->at(byte_index, guess) += SQUARE(hyp);
+				for (int p = 0; p < num_points; p++) {
+					sum_hypothesis_trace->at(byte_index, guess, p)
+							+= hyp * traces->at(t, p);
+				}
 			}
+		}
+	}
+
+	#pragma omp parallel for
+	for (int p = 0; p < num_points; p++) {
+		int end_window = std::min(num_points, p + window_size + 1);
+		for (int w = p + 1; w < end_window; w++) {
+			for (int t = 0; t < num_traces; t++) {
+				sum_trace_x_win->at(p, w - p - 1) += traces->at(t, w) * traces->at(t, p); // combined
+				sum_trace2_x_win->at(p, w - p - 1) += SQUARE(traces->at(t, p)) * traces->at(t, w);
+				sum_trace_x_win2->at(p, w - p - 1) += SQUARE(traces->at(t, w)) * traces->at(t, p);
+				sum_trace2_x_win2->at(p, w - p - 1) += SQUARE(traces->at(t, w)) * SQUARE(traces->at(t, p));
+			}
+		}
+	}
+
+	#pragma omp parallel for collapse(2)
+	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
+		for (int p = 0; p < num_points; p++) {
 
 			int end_window = std::min(num_points, p + window_size + 1);
 			for (int w = p + 1; w < end_window; w++) { 
-				QUADFLOAT s2 = 0, s4 = 0, s8 = 0, s11 = 0, s12 = 0, s13 = 0; // reusable for each byte index
-				for (int t = 0; t < num_traces; t++) {
-					s2 += traces->at(t, w); // replaceable with sum_trace
-					s8 += SQUARE(traces->at(t, w)); // replaceable with sum_trace_square
-					s4 += traces->at(t, w) * traces->at(t, p); // combined
-					s12 += SQUARE(traces->at(t, p)) * traces->at(t, w);
-					s13 += SQUARE(traces->at(t, w)) * traces->at(t, p);
-					s11 += SQUARE(traces->at(t, w)) * SQUARE(traces->at(t, p));
-				}
+
+			auto s1 = sum_trace[p];
+			auto s6 = sum_trace_square[p];
+				auto s2 = sum_trace[w];
+				auto s8 = sum_trace_square[w];
+				auto s4 = sum_trace_x_win->at(p, w - p - 1);
+				auto s12 = sum_trace2_x_win->at(p, w - p - 1);
+				auto s13 = sum_trace_x_win2->at(p, w - p - 1);
+				auto s11 = sum_trace2_x_win2->at(p, w - p - 1);
+
 				double n_lambda3 = (double)total_traces * s11 - 2.0 * (s2 * s12 + s1 * s13)  +
 						(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (double)total_traces -
 						3.0 * SQUARE(s1 * s2) / (double)SQUARE(total_traces);
 				double lambda2 = s4 - (s1 * s2)/(double)total_traces;
-				if (byte_index == 0 && p == 0 ) {
-					if ((n_lambda3 - lambda2) < 0) {
-						printf("n_lambda3: %lf\n", (double)n_lambda3);
-						printf("lambda2: %lf\n", (double)lambda2);
-						printf("n_lambda3 - lambda2: %lf\n", (double)(n_lambda3 - lambda2));
-					}
-				}
+
 				for (int guess = 0; guess < NUM_GUESSES; guess++) {
 					int64_t s3 = 0, s5 = 0;
 					QUADFLOAT s7 = 0, s9 = 0, s10 = 0;
 					for (int t = 0; t < num_traces; t++) {
 						auto hyp = hypothetial_leakage->at(byte_index, guess, t);
-						s3 += hyp; // independent from points
-						s9 += SQUARE(hyp);
-						s5 += hyp * traces->at(t, p);
-						s7 += hyp * traces->at(t, w);
-						s10 += hyp * traces->at(t, p) * traces->at(t, w);
+						sum_hypothesis_combined_trace->at(byte_index, guess, p, w - 1 - p)
+						 += hyp * traces->at(t, p) * traces->at(t, w);
 					}
+					s3 = sum_hypothesis->at(byte_index, guess);
+					s9 = sum_hypothesis_square->at(byte_index, guess);
+					s5 = sum_hypothesis_trace->at(byte_index, guess, p);
+					s7 = sum_hypothesis_trace->at(byte_index, guess, w);
+					s10 = sum_hypothesis_combined_trace->at(byte_index, guess, p, w - 1 - p);
 					double n_lambda1 = (double)total_traces * s10 - (s1 * s7 + s2 * s5)  + (s1 * s2 * s3)/ (double)total_traces;
 					corr->at(byte_index, guess, p, w - 1 - p) = (n_lambda1 - (RESULT_T)lambda2 * (RESULT_T)s3) /
 						std::sqrt(((RESULT_T)n_lambda3 - SQUARE((RESULT_T)lambda2)) * (total_traces * (RESULT_T)s9 - SQUARE((RESULT_T)s3)));
-						// check is nan
-						// if (byte_index == 0 && guess == 0 && p == 0) {
-						// 	printf("n_lambda1: %lf\n", (double)n_lambda1);
-						// 	printf("lambda2: %lf\n", (double)lambda2);
-						// 	printf("n_lambda3: %lf\n", (double)n_lambda3);
-						// 	printf("s3: %lf\n", (double)s3);
-						// 	printf("s9: %lf\n", (double)s9);
-						// 	break;
-						// }
 
 				}
 			}
-
 		}
 	}
+	printf("done\n");
 
 	return py_corr;
 }

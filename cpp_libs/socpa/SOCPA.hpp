@@ -34,7 +34,15 @@ public:
 		sum_hypothesis = new Array2D<int64_t>(byte_length, NUM_GUESSES);
 		sum_hypothesis_square = new Array2D<int64_t>(byte_length, NUM_GUESSES);
 
-		sum_hypothesis_trace = new Array4D<RESULT_T>(byte_length, NUM_GUESSES, num_points, window_size);
+		sum_hypothesis_trace = new Array3D<RESULT_T>(byte_length, NUM_GUESSES, num_points);
+
+		sum_hypothesis_combined_trace = new Array4D<RESULT_T>(byte_length, NUM_GUESSES, num_points, window_size);
+
+		sum_trace_x_win = new Array2D<QUADFLOAT>(num_points, window_size);
+		sum_trace2_x_win = new Array2D<QUADFLOAT>(num_points, window_size);
+		sum_trace_x_win2 = new Array2D<QUADFLOAT>(num_points, window_size);
+		sum_trace2_x_win2 = new Array2D<QUADFLOAT>(num_points, window_size);
+
 
 	};
 
@@ -69,7 +77,15 @@ protected:
 	Array2D<int64_t> *sum_hypothesis; // [0:byte_length][0:num_guesses]
 	Array2D<int64_t> *sum_hypothesis_square; // [0:byte_length][0:num_guesses]
 
-	Array4D<RESULT_T> *sum_hypothesis_trace; // [0:byte_length][0:num_guesses][0:num_points][0:window_size]
+	Array3D<RESULT_T> *sum_hypothesis_trace; // [0:byte_length][0:num_guesses][0:num_points][0:window_size]
+
+	Array4D<RESULT_T> *sum_hypothesis_combined_trace; // [0:byte_length][0:num_guesses][0:num_points][0:window_size]
+
+	// combined traces
+	Array2D<QUADFLOAT> *sum_trace_x_win; // [0:num_points][0:window_size]
+	Array2D<QUADFLOAT> *sum_trace2_x_win; // [0:num_points][0:window_size]
+	Array2D<QUADFLOAT> *sum_trace_x_win2; // [0:num_points][0:window_size]
+	Array2D<QUADFLOAT> *sum_trace2_x_win2; // [0:num_points][0:window_size]
 
 	virtual void update_sum_trace();
 	virtual void calclualte_sumden2(Array2D<QUADFLOAT> *sumden2);

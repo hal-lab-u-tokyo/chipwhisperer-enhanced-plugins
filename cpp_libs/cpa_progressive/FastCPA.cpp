@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 07-05-2024 12:00:11
+*    Last Modified: 31-01-2025 07:48:05
 */
 
 
@@ -91,7 +91,6 @@ void FastCPA::update_sum_trace() {
 	#endif
 	for (int p = 0; p < num_points; p++) {
 		for (int t = 0; t < num_traces; t++) {
-			QUADFLOAT prev = sum_trace[p];
 			sum_trace[p] += traces->at(t, p);
 			sum_trace_square[p] += SQUARE(traces->at(t, p));
 		}
@@ -109,7 +108,6 @@ void FastCPA::calclualte_sumden2(QUADFLOAT *sumden2) {
 #else
 		sumden2[p] = std::fma(- (QUADFLOAT)total_traces, sum_trace_square[p], SQUARE(sum_trace[p]));
 #endif
-
 	}
 }
 

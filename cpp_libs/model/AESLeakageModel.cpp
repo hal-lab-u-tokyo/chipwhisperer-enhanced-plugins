@@ -1,11 +1,11 @@
 /*
 *    Copyright (C) 2024 The University of Tokyo
 *    
-*    File:          /cpp_libs/cpa_progressive/AESLeakageModel.cpp
+*    File:          /cpp_libs/model/AESLeakageModel.cpp
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:30:57
-*    Last Modified: 01-04-2024 16:43:43
+*    Last Modified: 30-01-2025 07:52:54
 */
 
 

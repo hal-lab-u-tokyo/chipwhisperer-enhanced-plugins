@@ -199,6 +199,7 @@ void FastCPACuda::calculate_correlation_subkey(Array3D<TRACE_T>* diff, QUADFLOAT
 
 PYBIND11_MODULE(cpa_cuda_kernel, module) {
 	module.doc() = "CUDA implemetation plugin for CPA";
+
 	py::class_<FastCPACuda,FastCPA>(module, "FastCPACuda")
 		.def(py::init<int, int, AESLeakageModel::ModelBase*>());
 

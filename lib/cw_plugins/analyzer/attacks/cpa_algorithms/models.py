@@ -1,5 +1,5 @@
 from chipwhisperer.analyzer.attacks.models.AES128_8bit import *
-from . import cpa_kernel
+from . import model_kernel
 
 from chipwhisperer.analyzer.attacks.models.AES128_8bit import AESLeakageHelper
 
@@ -15,13 +15,13 @@ class PlaintextKeyXORDiff(AESLeakageHelper):
 
 
 model_dict = {
-    SBox_output: cpa_kernel.SBoxOutput,
-    SBoxInOutDiff: cpa_kernel.SBoxInOutDiff,
-    LastroundStateDiff: cpa_kernel.LastRoundStateDiff,
-    LastroundHW: cpa_kernel.LastRoundState,
-    LastroundStateDiffAlternate: cpa_kernel.LastRoundStateDiffAlternate,
-    PtKey_XOR: cpa_kernel.PlaintextKeyXOR,
-    PlaintextKeyXORDiff: cpa_kernel.PlaintextKeyXORDiff
+    SBox_output: model_kernel.SBoxOutput,
+    SBoxInOutDiff: model_kernel.SBoxInOutDiff,
+    LastroundStateDiff: model_kernel.LastRoundStateDiff,
+    LastroundHW: model_kernel.LastRoundState,
+    LastroundStateDiffAlternate: model_kernel.LastRoundStateDiffAlternate,
+    PtKey_XOR: model_kernel.PlaintextKeyXOR,
+    PlaintextKeyXORDiff: model_kernel.PlaintextKeyXORDiff
 }
 
 def get_c_model(model):

@@ -5,7 +5,7 @@
 #    Project:       tkojima
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  16-01-2024 21:01:52
-#    Last Modified: 05-05-2024 20:26:59
+#    Last Modified: 30-01-2025 08:06:02
 #
 
 cmake_minimum_required(VERSION 3.20)
@@ -97,4 +97,6 @@ else()
 	message(STATUS "Skip building OpenCL libraries")
 endif()
 
+add_subdirectory(model)
 add_subdirectory(cpa_progressive)
+add_subdirectory(socpa)

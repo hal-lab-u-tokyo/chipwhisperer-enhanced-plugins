@@ -1,11 +1,11 @@
 /*
 *    Copyright (C) 2024 The University of Tokyo
 *    
-*    File:          /cpp_libs/cpa_progressive/AESLeakageModel.hpp
+*    File:          /cpp_libs/include/AESLeakageModel.hpp
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:04
-*    Last Modified: 01-04-2024 16:43:33
+*    Last Modified: 30-01-2025 08:06:52
 */
 
 
@@ -13,15 +13,11 @@
 #define AESLEAKAGEMODEL_H
 
 #include <stdint.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
 #include <vector>
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-
-namespace py = pybind11;
 
 namespace AESLeakageModel {
 

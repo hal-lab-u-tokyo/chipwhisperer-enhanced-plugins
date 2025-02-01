@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 06:33:19
-*    Last Modified: 01-02-2025 05:24:48
+*    Last Modified: 01-02-2025 08:59:30
 */
 
 
@@ -27,7 +27,7 @@
 namespace py = pybind11;
 using namespace std;
 
-py::array_t<RESULT_T> SOCPABase::calculate_correlation(py::array_t<TRACE_T> &py_traces,
+py::array_t<RESULT_T> SOCPA::calculate_correlation(py::array_t<TRACE_T> &py_traces,
 											py::array_t<uint8_t> &py_plaintext,
 											py::array_t<uint8_t> &py_ciphertext,
 											py::array_t<uint8_t> &py_knownkey)
@@ -35,103 +35,33 @@ py::array_t<RESULT_T> SOCPABase::calculate_correlation(py::array_t<TRACE_T> &py_
 
 	setup_arrays(py_traces, py_plaintext, py_ciphertext, py_knownkey);
 	total_traces += num_traces;
-	// auto end = chrono::system_clock::now();
 
+	// sum up each sample of traces
 	update_sum_trace();
 
-	// Array2D<QUADFLOAT> *sumden2 = new Array2D<QUADFLOAT>(num_points, window_size);
-	// calclualte_sumden2(sumden2);
-
+	// calculate hypothetical leakage from the leakage model
 	calculate_hypothesis();
+
+	// sum up the product of hypothetical leakage and traces
+	update_sum_hypothesis_trace();
+
+	// sum up the product of hypothetical leakage and paired traces
+	update_sum_hypothesis_combined_trace();
+
 
 	py::array_t<RESULT_T> py_corr({byte_length, NUM_GUESSES, num_points, window_size});
 	Array4D<RESULT_T>* corr = new Array4D<RESULT_T>((RESULT_T*)py_corr.request().ptr,
 											byte_length, NUM_GUESSES, num_points, window_size);
 
-	// calculate_correlation_subkey(corr, sumden2);
-	// auto end2 = chrono::system_clock::now();
 
-	// delete sumden2;
-
-	printf("total traces: %d\n", total_traces);
-
-	#pragma omp parallel for collapse(2)
-	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
-		for (int guess = 0; guess < NUM_GUESSES; guess++) {
-			for (int t = 0; t < num_traces; t++) {
-				auto hyp = hypothetial_leakage->at(byte_index, guess, t);
-				sum_hypothesis->at(byte_index, guess) += hyp;
-				sum_hypothesis_square->at(byte_index, guess) += SQUARE(hyp);
-				for (int p = 0; p < num_points; p++) {
-					sum_hypothesis_trace->at(byte_index, guess, p)
-							+= hyp * traces->at(t, p);
-				}
-			}
-		}
-	}
-
-	#pragma omp parallel for
-	for (int p = 0; p < num_points; p++) {
-		int end_window = std::min(num_points, p + window_size + 1);
-		for (int w = p + 1; w < end_window; w++) {
-			for (int t = 0; t < num_traces; t++) {
-				sum_trace_x_win->at(p, w - p - 1) += traces->at(t, w) * traces->at(t, p); // combined
-				sum_trace2_x_win->at(p, w - p - 1) += SQUARE(traces->at(t, p)) * traces->at(t, w);
-				sum_trace_x_win2->at(p, w - p - 1) += SQUARE(traces->at(t, w)) * traces->at(t, p);
-				sum_trace2_x_win2->at(p, w - p - 1) += SQUARE(traces->at(t, w)) * SQUARE(traces->at(t, p));
-			}
-		}
-	}
-
-	#pragma omp parallel for collapse(2)
-	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
-		for (int p = 0; p < num_points; p++) {
-
-			int end_window = std::min(num_points, p + window_size + 1);
-			for (int w = p + 1; w < end_window; w++) { 
-
-			auto s1 = sum_trace[p];
-			auto s6 = sum_trace_square[p];
-				auto s2 = sum_trace[w];
-				auto s8 = sum_trace_square[w];
-				auto s4 = sum_trace_x_win->at(p, w - p - 1);
-				auto s12 = sum_trace2_x_win->at(p, w - p - 1);
-				auto s13 = sum_trace_x_win2->at(p, w - p - 1);
-				auto s11 = sum_trace2_x_win2->at(p, w - p - 1);
-
-				double n_lambda3 = (double)total_traces * s11 - 2.0 * (s2 * s12 + s1 * s13)  +
-						(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (double)total_traces -
-						3.0 * SQUARE(s1 * s2) / (double)SQUARE(total_traces);
-				double lambda2 = s4 - (s1 * s2)/(double)total_traces;
-
-				for (int guess = 0; guess < NUM_GUESSES; guess++) {
-					int64_t s3 = 0, s5 = 0;
-					QUADFLOAT s7 = 0, s9 = 0, s10 = 0;
-					for (int t = 0; t < num_traces; t++) {
-						auto hyp = hypothetial_leakage->at(byte_index, guess, t);
-						sum_hypothesis_combined_trace->at(byte_index, guess, p, w - 1 - p)
-						 += hyp * traces->at(t, p) * traces->at(t, w);
-					}
-					s3 = sum_hypothesis->at(byte_index, guess);
-					s9 = sum_hypothesis_square->at(byte_index, guess);
-					s5 = sum_hypothesis_trace->at(byte_index, guess, p);
-					s7 = sum_hypothesis_trace->at(byte_index, guess, w);
-					s10 = sum_hypothesis_combined_trace->at(byte_index, guess, p, w - 1 - p);
-					double n_lambda1 = (double)total_traces * s10 - (s1 * s7 + s2 * s5)  + (s1 * s2 * s3)/ (double)total_traces;
-					corr->at(byte_index, guess, p, w - 1 - p) = (n_lambda1 - (RESULT_T)lambda2 * (RESULT_T)s3) /
-						std::sqrt(((RESULT_T)n_lambda3 - SQUARE((RESULT_T)lambda2)) * (total_traces * (RESULT_T)s9 - SQUARE((RESULT_T)s3)));
-
-				}
-			}
-		}
-	}
-	printf("done\n");
+	// calculate correlation
+	calculate_correlation_subkey(corr);
 
 	return py_corr;
 }
 
 
-void SOCPABase::setup_arrays(py::array_t<TRACE_T> &py_traces,
+void SOCPA::setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey) {
@@ -161,41 +91,53 @@ void SOCPABase::setup_arrays(py::array_t<TRACE_T> &py_traces,
 
 	hypothetial_leakage = new Array3D<int>(byte_length, NUM_GUESSES, num_traces);
 
-	combine();
 };
 
 
-void SOCPABase::update_sum_trace() {
+void SOCPA::update_sum_trace() {
 	// update sum_trace and sum_trace_square
 	#ifdef _OPENMP
 	#pragma omp parallel for
 	#endif
 	for (int p = 0; p < num_points; p++) {
 		for (int t = 0; t < num_traces; t++) {
-			sum_trace[p] += traces->at(t, p);
-			sum_trace_square[p] += SQUARE(traces->at(t, p));
+			auto v1 = traces->at(t, p);
+			sum_trace[p] += v1;
+			sum_trace_square[p] += SQUARE(v1);
+			int end_window = std::min(num_points, p + window_size + 1);
+			for (int w = p + 1; w < end_window; w++) {
+				auto v2 = traces->at(t, w);
+				sum_trace_x_win->at(p, w - p - 1) += v1 * v2;
+				sum_trace2_x_win->at(p, w - p - 1) += SQUARE(v1) * v2;
+				sum_trace_x_win2->at(p, w - p - 1) += v1 * SQUARE(v2);
+				sum_trace2_x_win2->at(p, w - p - 1) += SQUARE(v1) * SQUARE(v2);
+			}
+		}
+	}
+
+}
+
+void SOCPA::update_sum_hypothesis_trace() {
+	// update sum_hypothesis_trace
+	#ifdef _OPENMP
+	#pragma omp parallel for collapse(2)
+	#endif
+	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
+		for (int guess = 0; guess < NUM_GUESSES; guess++) {
+			for (int t = 0; t < num_traces; t++) {
+				auto hyp = hypothetial_leakage->at(byte_index, guess, t);
+				sum_hypothesis->at(byte_index, guess) += hyp;
+				sum_hypothesis_square->at(byte_index, guess) += SQUARE(hyp);
+				for (int p = 0; p < num_points; p++) {
+					sum_hypothesis_trace->at(byte_index, guess, p)
+							+= hyp * traces->at(t, p);
+				}
+			}
 		}
 	}
 }
 
-void SOCPABase::calclualte_sumden2(Array2D<QUADFLOAT> *sumden2) {
-
-// 	#ifdef _OPENMP
-// 	#pragma omp parallel for
-// 	#endif
-// 	for (int p = 0; p < num_points; p++) {
-// 		int end_window = std::min(window_size, num_points - p - 1);
-// 		for (int win = 0; win < end_window; win++) {
-// #ifdef SOFT_QUAD_PRECISION
-// 			sumden2->at(p, win) = SQUARE(sum_trace->at(p, win)) - (QUADFLOAT)total_traces * sum_trace_square->at(p, win);
-// #else
-// 			sumden2->at(p, win) = std::fma(- (QUADFLOAT)total_traces, sum_trace_square->at(p, win), SQUARE(sum_trace->at(p, win)));
-// #endif
-// 		}
-// 	}
-}
-
-void SOCPABase::calculate_hypothesis() {
+void SOCPA::calculate_hypothesis() {
 	#ifdef _OPENMP
 	#pragma omp parallel for collapse(2)
 	#endif
@@ -219,71 +161,76 @@ void SOCPABase::calculate_hypothesis() {
 	}
 }
 
-
-void SOCPABase::calculate_correlation_subkey(Array4D<RESULT_T>* corr, Array2D<QUADFLOAT> *sumden2) {
-
-	// QUADFLOAT sumden1;
-
-	// auto start = chrono::system_clock::now();
-	// // loop for each byte
-	// #ifdef _OPENMP
-	// #pragma omp parallel for private(sumden1) schedule(guided, 4)
-	// #endif
-	// for (int guess = 0; guess < NUM_GUESSES; guess++) {
-	// 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
-	// 		for (int t = 0; t < num_traces; t++) {
-	// 			auto hyp = hypothetial_leakage->at(byte_index, guess, t);
-	// 			sum_hypothesis->at(byte_index, guess) += hyp;
-	// 			sum_hypothesis_square->at(byte_index, guess) += SQUARE(hyp);
-	// 			// sum up hypothesis * trace
-	// 			for (int p = 0; p < num_points; p++) {
-	// 				int end_window = std::min(window_size, num_points - p - 1);
-	// 				for (int win = 0; win < end_window; win++) {
-	// 					sum_hypothesis_trace->at(byte_index, guess, p, win)
-	// 						+= hyp * combined_traces->at(t, p, win);
-	// 				}
-	// 			}
-	// 		}
-
-	// 		// calc sumden1
-	// 		sumden1 = SQUARE(sum_hypothesis->at(byte_index, guess))
-	// 		- total_traces * sum_hypothesis_square->at(byte_index, guess);
-
-	// 		// calc sumnum
-	// 		for (int p = 0; p < num_points; p++) {
-	// 			int end_window = std::min(window_size, num_points - p - 1);
-	// 			for (int win = 0; win < end_window; win++) {
-	// 				QUADFLOAT sumnum = (QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p, win)
-	// 				- sum_trace->at(p, win) * sum_hypothesis->at(byte_index, guess);
-
-	// 				corr->at(byte_index, guess, p, win) = (RESULT_T)sumnum / std::sqrt((RESULT_T)sumden1 * (RESULT_T)sumden2->at(p, win));
-	// 			}
-	// 		}
-	// 	}
-	// }
-	// auto end = chrono::system_clock::now();
-	// auto dur = end - start;
-	// std::cout << "calculation time: " << chrono::duration_cast<chrono::milliseconds>(dur).count() << "ms" << std::endl;
-
+void SOCPA::update_sum_hypothesis_combined_trace()
+{
+	#ifdef _OPENMP
+	#pragma omp parallel for collapse(3)
+	#endif
+	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
+		for (int guess = 0; guess < NUM_GUESSES; guess++) {
+			for (int p = 0; p < num_points; p++) {
+				auto *partial_sum = new RESULT_T[window_size]();
+				for (int t = 0; t < num_traces; t++) {
+					auto v1 = traces->at(t, p);
+					auto hyp = hypothetial_leakage->at(byte_index, guess, t);
+					int end_window = std::min(num_points, p + window_size + 1);
+					for (int w = p + 1; w < end_window; w++) {
+						partial_sum[w - p - 1] += hyp * v1 * traces->at(t, w);
+					}
+				}
+				for (int w = 0; w < window_size; w++) {
+					sum_hypothesis_combined_trace->at(byte_index, guess, p, w) += partial_sum[w];
+				}
+				delete[] partial_sum;
+			}
+		}
+	}
 }
 
+void SOCPA::calculate_correlation_subkey(Array4D<RESULT_T>* corr) {
 
+	/* calculation formula and symbols are the same as the following paper:
+		Bottinelli, Paul, and Joppe W. Bos. "Computational aspects of correlation power analysis." Journal of Cryptographic Engineering 7 (2017): 167-181.
+	*
+	* */
 
-void ProductCombineSOCPA::combine() {
+	#ifdef _OPENMP
+	#pragma omp parallel for collapse(2)
+	#endif
+	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
+		for (int p = 0; p < num_points; p++) {
+			int end_window = std::min(num_points, p + window_size + 1);
+			for (int w = p + 1; w < end_window; w++) { 
 
-	// combined_traces = new Array3D<TRACE_T>(num_traces, num_points, window_size);
+				auto s1 = sum_trace[p];
+				auto s6 = sum_trace_square[p];
+				auto s2 = sum_trace[w];
+				auto s8 = sum_trace_square[w];
+				auto s4 = sum_trace_x_win->at(p, w - p - 1);
+				auto s12 = sum_trace2_x_win->at(p, w - p - 1);
+				auto s13 = sum_trace_x_win2->at(p, w - p - 1);
+				auto s11 = sum_trace2_x_win2->at(p, w - p - 1);
 
-	// // combine traces
-	// #ifdef _OPENMP
-	// #pragma omp parallel for
-	// #endif
-	// for (int t = 0; t < num_traces; t++) {
-	// 	for (int p = 0; p < num_points; p++) {
-	// 		int end_window = std::min(window_size, num_points - p - 1);
-	// 		for (int w = 0; w < end_window; w++) {
-	// 			combined_traces->at(t, p, w) = (traces->at(t, p) - average_trace[p]) *
-	// 				(traces->at(t, p + w + 1) - average_trace[p + w + 1]);
-	// 		}
-	// 	}
-	// }
+				QUADFLOAT n_lambda3 = (QUADFLOAT)total_traces * s11 - 2.0 * (s2 * s12 + s1 * s13)  +
+						(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (QUADFLOAT)total_traces -
+						3.0 * SQUARE(s1 * s2) / (QUADFLOAT)SQUARE(total_traces);
+				QUADFLOAT lambda2 = s4 - (s1 * s2)/(QUADFLOAT)total_traces;
+
+				for (int guess = 0; guess < NUM_GUESSES; guess++) {
+					auto s3 = sum_hypothesis->at(byte_index, guess);
+					auto s9 = sum_hypothesis_square->at(byte_index, guess);
+					auto s5 = sum_hypothesis_trace->at(byte_index, guess, p);
+					auto s7 = sum_hypothesis_trace->at(byte_index, guess, w);
+					auto s10 = sum_hypothesis_combined_trace->at(byte_index, guess, p, w - 1 - p);
+
+					QUADFLOAT n_lambda1 = (QUADFLOAT)total_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3)/ (QUADFLOAT)total_traces;
+					corr->at(byte_index, guess, p, w - 1 - p) =
+						(RESULT_T)(n_lambda1 - lambda2 * s3) /
+						std::sqrt((RESULT_T)(((n_lambda3 - SQUARE(lambda2)) * (total_traces * s9 - SQUARE(s3)))));
+
+				}
+			}
+		}
+	}
 }
+

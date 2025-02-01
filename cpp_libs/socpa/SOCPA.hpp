@@ -1,3 +1,14 @@
+/*
+*    Copyright (C) 2025 The University of Tokyo
+*    
+*    File:          /cpp_libs/socpa/SOCPA.hpp
+*    Project:       sca_toolbox
+*    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+*    Created Date:  01-02-2025 09:07:43
+*    Last Modified: 01-02-2025 09:07:44
+*/
+
+
 #ifndef SOCPA_H
 #define SOCPA_H
 
@@ -21,11 +32,11 @@ using QUADFLOAT = long double;
 using TRACE_T = double;
 using RESULT_T = double;
 
-class SOCPABase {
+class SOCPA {
 public:
 	const int NUM_GUESSES = 256;
 	// Constructor
-	SOCPABase(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model) :
+	SOCPA(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model) :
 		byte_length(byte_length), num_points(num_points), total_traces(0), model(model), window_size(window_size) {
 		// init arrays
 		sum_trace = new QUADFLOAT[num_points]();
@@ -46,8 +57,8 @@ public:
 
 	};
 
-	SOCPABase(int byte_length, int num_points, AESLeakageModel::ModelBase *model) :
-		SOCPABase(byte_length, num_points, num_points, model) {};
+	SOCPA(int byte_length, int num_points, AESLeakageModel::ModelBase *model) :
+		SOCPA(byte_length, num_points, num_points, model) {};
 
 	py::array_t<RESULT_T> calculate_correlation(py::array_t<TRACE_T> &py_traces,
 								py::array_t<uint8_t> &py_plaintext,
@@ -88,10 +99,10 @@ protected:
 	Array2D<QUADFLOAT> *sum_trace2_x_win2; // [0:num_points][0:window_size]
 
 	virtual void update_sum_trace();
-	virtual void calclualte_sumden2(Array2D<QUADFLOAT> *sumden2);
 	virtual void calculate_hypothesis();
-	virtual void calculate_correlation_subkey(Array4D<RESULT_T>* corr, Array2D<QUADFLOAT> *sumden2);
-	virtual void combine() = 0;
+	virtual void update_sum_hypothesis_trace();
+	virtual void update_sum_hypothesis_combined_trace();
+	virtual void calculate_correlation_subkey(Array4D<RESULT_T>* corr);
 
 
 	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,
@@ -118,19 +129,5 @@ protected:
 
 };
 
-#include <stdio.h>
-
-class ProductCombineSOCPA : public SOCPABase {
-public:
-	ProductCombineSOCPA(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model, py::array_t<TRACE_T> &py_average_trace) :
-		SOCPABase(byte_length, num_points, window_size, model) {
-			average_trace = (TRACE_T*)py_average_trace.request().ptr;
-		};
-protected:
-	virtual void combine();
-
-	TRACE_T *average_trace;
-
-};
 
 #endif //SOCPA_H

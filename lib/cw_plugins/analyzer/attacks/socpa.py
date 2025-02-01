@@ -1,47 +1,63 @@
+###
+#   Copyright (C) 2025 The University of Tokyo
+#   
+#   File:          /lib/cw_plugins/analyzer/attacks/socpa.py
+#   Project:       sca_toolbox
+#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+#   Created Date:  01-02-2025 09:07:18
+#   Last Modified: 01-02-2025 09:07:25
+###
+
+
 from chipwhisperer.analyzer.attacks._base import AttackBaseClass
 from chipwhisperer.analyzer.attacks.algorithmsbase import AlgorithmsBase
 from chipwhisperer.analyzer.attacks.models.base import ModelsBase
 import chipwhisperer as cw
-cw.open_project
 
 import numpy as np
-import time
 
 from .cpa_algorithms.models import get_c_model
+from .socpa_stats import SOCPAResults
 
-class SOCPAAlogrithmBase(AlgorithmsBase):
+class SOCPAAlogrithm(AlgorithmsBase):
     """
     Second Order CPA Attack
     """
 
     def __init__(self):
         super().__init__()
-        self.window_size = 300
+        self._window_size = 1
 
+    def set_window_size(self, winsize):
+        self._window_size = winsize
+
+    def get_window_size(self):
+        return self._window_size
+
+    def setModel(self, model):
+        self.model = model
+        if model:
+            self.stats = SOCPAResults(model.getNumSubKeys(), model.getPermPerSubkey(), self._window_size)
 
     def addTraces(self, traceSource, tracerange, progressBar=None, pointRange=None):
-        import time
+
         numtraces = tracerange[1] - tracerange[0]
         numpoints = pointRange[1] - pointRange[0]
 
+        if self._window_size > numpoints:
+            raise ValueError("Window size cannot be greater than number of points in trace")
+
         byte_len = max(self.brange) + 1
-
-
-        full_trace = np.array([traceSource.get_trace(t)[pointRange[0]:pointRange[1]] for t in range(tracerange[0], tracerange[1])])
-
-        average_trace = np.mean(full_trace, axis=0)
-        print(average_trace.shape, average_trace.ndim)
 
         model = get_c_model(self.model)
 
-        from .cpa_algorithms.socpa_kernel import ProductCombineSOCPA
-        socpa = ProductCombineSOCPA(byte_len, numpoints, self.window_size, model, average_trace)
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        socpa = SOCPA(byte_len, numpoints, self._window_size, model)
 
         tstart = 0
         tend = self._reportingInterval
 
         while tstart < numtraces:
-            print("tstart: ", tstart)
             if tend > numtraces:
                 tend = numtraces
 
@@ -49,7 +65,7 @@ class SOCPAAlogrithmBase(AlgorithmsBase):
                 tstart = numtraces
 
             trange = range(tstart, tend)
-            part_trace = full_trace[tstart:tend]
+            part_trace = np.array([traceSource.get_trace(t + tracerange[0])[pointRange[0]:pointRange[1]] for t in trange])
             part_textin = np.array([traceSource.get_textin(t + tracerange[0]) for t in trange])
             if type(traceSource.get_textout(0)) == bytes:
                 part_textout = np.array([np.frombuffer(traceSource.get_textout(t + tracerange[0]), dtype=np.uint8) for t in trange])
@@ -58,36 +74,30 @@ class SOCPAAlogrithmBase(AlgorithmsBase):
 
             part_knownkey = np.array([traceSource.get_known_key(t + tracerange[0]) for t in trange])
 
-            start = time.time()
+            # run c++ library
             corr = socpa.calculate_correlation(part_trace, part_textin, part_textout, part_knownkey)
-            end = time.time()
-            print("Time taken: ", end-start)
 
-            max_corr_idx = np.argmax(corr, axis=3)
-            max_corr = np.max(np.abs(corr), axis=3)
+            # save statistics
             for bnum in self.brange:
-                self.stats.update_subkey(bnum, max_corr[bnum], tnum=tend)
-            # del diff
-            #     # if progressBar and progressBar.wasAborted():
-            #     #     return
-
+                self.stats.update_subkey(bnum, corr[bnum], tnum=tend)
 
             tend += self._reportingInterval
             tstart += self._reportingInterval
+
             del part_trace, part_textin, part_textout, part_knownkey
 
+            # Run callback
             if self.sr:
                 self.sr()
 
+        # del socpa
         del socpa
 
-        return corr
-   
 
 class SOCPA(AttackBaseClass):
     """Second Order CPA Attack"""
 
-    def __init__(self, proj, algorithm : SOCPAAlogrithmBase, leak_model : ModelsBase):
+    def __init__(self, proj, algorithm : SOCPAAlogrithm, leak_model : ModelsBase):
         self._analysisAlgorithm = algorithm()
         super().__init__()
         self.updateScript()
@@ -122,6 +132,14 @@ class SOCPA(AttackBaseClass):
     def get_trace_range(self):
         return (self.get_trace_start(), self.get_trace_end())
 
+    @property
+    def window_size(self):
+        return self.attack.get_window_size()
+
+    @window_size.setter
+    def window_size(self, winsize):
+        self.attack.set_window_size(winsize)
+
     def process_known_key(self, inpkey):
         if inpkey is None:
             return None
@@ -138,8 +156,12 @@ class SOCPA(AttackBaseClass):
     def results(self):
         return self.getStatistics()
 
+    @property
+    def reporting_interval(self):
+        return self.get_reporting_interval()
+
     def process_traces(self, callback=None):
-    
+
         self.attack.setModel(self.attackModel)
         self.attack.get_statistics().clear()
         self.attack.setReportingInterval(self.get_reporting_interval())
@@ -147,11 +169,10 @@ class SOCPA(AttackBaseClass):
         self.attack.setTargetSubkeys(self.get_target_subkeys())
         self.attack.setStatsReadyCallback(callback)
 
-        corr = self.attack.addTraces(self.get_trace_source(), self.get_trace_range(), None, pointRange=self.get_point_range())
+        self.attack.addTraces(self.get_trace_source(), self.get_trace_range(), None, pointRange=self.get_point_range())
 
         # close trace manager
-   
-        # return self.attack.get_statistics()
-        return corr
+        return self.attack.get_statistics()
+
 
 

@@ -66,10 +66,6 @@ void FastCPACuda::setup_arrays(py::array_t<TRACE_T> &py_traces,
 	if (device_hypothetial_leakage == nullptr) {
 		CUDA_CHECK(cudaMalloc((void**)&device_hypothetial_leakage,
 						hypothetial_leakage->get_size()));
-		// CUDA_CHECK(cudaMemcpy(device_hypothetial_leakage,
-		// 						hypothetial_leakage->get_pointer(),
-		// 						hypothetial_leakage->get_size(),
-		// 						cudaMemcpyHostToDevice));
 	}
 	if (device_sum_hypothesis_trace == nullptr) {
 		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_trace,

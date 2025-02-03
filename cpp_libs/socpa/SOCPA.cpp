@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 06:33:19
-*    Last Modified: 01-02-2025 08:59:30
+*    Last Modified: 04-02-2025 07:23:48
 */
 
 
@@ -177,6 +177,10 @@ void SOCPA::update_sum_hypothesis_combined_trace()
 					for (int w = p + 1; w < end_window; w++) {
 						partial_sum[w - p - 1] += hyp * v1 * traces->at(t, w);
 					}
+					// if (byte_index == 0 && guess == 0 && p == 1) {
+					// 	cout << "t=" << t << " v1=" << v1 << " v2="  <<   traces->at(t, p + 1) << " hyp=" << hyp 
+					// 		<< " partial_sum=" << partial_sum[0] << endl;
+					// }
 				}
 				for (int w = 0; w < window_size; w++) {
 					sum_hypothesis_combined_trace->at(byte_index, guess, p, w) += partial_sum[w];
@@ -202,14 +206,14 @@ void SOCPA::calculate_correlation_subkey(Array4D<RESULT_T>* corr) {
 			int end_window = std::min(num_points, p + window_size + 1);
 			for (int w = p + 1; w < end_window; w++) { 
 
-				auto s1 = sum_trace[p];
-				auto s6 = sum_trace_square[p];
-				auto s2 = sum_trace[w];
-				auto s8 = sum_trace_square[w];
-				auto s4 = sum_trace_x_win->at(p, w - p - 1);
-				auto s12 = sum_trace2_x_win->at(p, w - p - 1);
-				auto s13 = sum_trace_x_win2->at(p, w - p - 1);
-				auto s11 = sum_trace2_x_win2->at(p, w - p - 1);
+				auto s1 = (QUADFLOAT)sum_trace[p];
+				auto s6 = (QUADFLOAT)sum_trace_square[p];
+				auto s2 = (QUADFLOAT)sum_trace[w];
+				auto s8 = (QUADFLOAT)sum_trace_square[w];
+				auto s4 = (QUADFLOAT)sum_trace_x_win->at(p, w - p - 1);
+				auto s12 = (QUADFLOAT)sum_trace2_x_win->at(p, w - p - 1);
+				auto s13 = (QUADFLOAT)sum_trace_x_win2->at(p, w - p - 1);
+				auto s11 = (QUADFLOAT)sum_trace2_x_win2->at(p, w - p - 1);
 
 				QUADFLOAT n_lambda3 = (QUADFLOAT)total_traces * s11 - 2.0 * (s2 * s12 + s1 * s13)  +
 						(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (QUADFLOAT)total_traces -

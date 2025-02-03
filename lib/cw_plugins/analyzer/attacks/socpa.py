@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 09:07:18
-#   Last Modified: 01-02-2025 09:07:25
+#   Last Modified: 03-02-2025 09:18:55
 ###
 
 
@@ -39,6 +39,11 @@ class SOCPAAlogrithm(AlgorithmsBase):
         if model:
             self.stats = SOCPAResults(model.getNumSubKeys(), model.getPermPerSubkey(), self._window_size)
 
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        return SOCPA(byte_len, numpoints, self._window_size, model)
+
+
     def addTraces(self, traceSource, tracerange, progressBar=None, pointRange=None):
 
         numtraces = tracerange[1] - tracerange[0]
@@ -51,8 +56,7 @@ class SOCPAAlogrithm(AlgorithmsBase):
 
         model = get_c_model(self.model)
 
-        from .cpa_algorithms.socpa_kernel import SOCPA
-        socpa = SOCPA(byte_len, numpoints, self._window_size, model)
+        socpa = self.getSoCpaKernel(byte_len, numpoints, model)
 
         tstart = 0
         tend = self._reportingInterval
@@ -93,6 +97,15 @@ class SOCPAAlogrithm(AlgorithmsBase):
         # del socpa
         del socpa
 
+class SOCPAAlogrithmCuda(SOCPAAlogrithm):
+    """
+    Second Order CPA Attack with CUDA
+    """
+
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        from .cpa_algorithms.socpa_cuda_kernel import SOCPACuda
+        return SOCPACuda(byte_len, numpoints, self._window_size, model)
 
 class SOCPA(AttackBaseClass):
     """Second Order CPA Attack"""

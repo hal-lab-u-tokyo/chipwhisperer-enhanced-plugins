@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 06:33:19
-*    Last Modified: 04-02-2025 07:23:48
+*    Last Modified: 05-02-2025 08:47:18
 */
 
 
@@ -163,32 +163,32 @@ void SOCPA::calculate_hypothesis() {
 
 void SOCPA::update_sum_hypothesis_combined_trace()
 {
+	// tiling parameter
+	const int tile_point = this->point_tile_size;
+	const int tile_trace = this->trace_tile_size;
+
 	#ifdef _OPENMP
-	#pragma omp parallel for collapse(3)
+	#pragma omp parallel for collapse(4)
 	#endif
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
-			for (int p = 0; p < num_points; p++) {
-				auto *partial_sum = new RESULT_T[window_size]();
-				for (int t = 0; t < num_traces; t++) {
-					auto v1 = traces->at(t, p);
-					auto hyp = hypothetial_leakage->at(byte_index, guess, t);
-					int end_window = std::min(num_points, p + window_size + 1);
-					for (int w = p + 1; w < end_window; w++) {
-						partial_sum[w - p - 1] += hyp * v1 * traces->at(t, w);
-					}
-					// if (byte_index == 0 && guess == 0 && p == 1) {
-					// 	cout << "t=" << t << " v1=" << v1 << " v2="  <<   traces->at(t, p + 1) << " hyp=" << hyp 
-					// 		<< " partial_sum=" << partial_sum[0] << endl;
-					// }
-				}
-				for (int w = 0; w < window_size; w++) {
-					sum_hypothesis_combined_trace->at(byte_index, guess, p, w) += partial_sum[w];
-				}
-				delete[] partial_sum;
-			}
+			for (int t = 0; t < num_traces; t += tile_trace) {
+				for (int p = 0; p < num_points; p += tile_point) {
+					for (int pp = 0; pp < std::min(tile_point, num_points - p); pp++) {
+						for (int tt = 0; tt < std::min(tile_trace, num_traces - t); tt++) {
+							auto hyp = hypothetial_leakage->at(byte_index, guess, t + tt);
+							auto v1 = traces->at(t + tt, p + pp);
+							int end_window = std::min(window_size, num_points - p - pp - 1);
+							for (int w = 0; w < end_window; w++) {
+								sum_hypothesis_combined_trace->at(byte_index, guess, p + pp, w) += hyp * v1 * traces->at(t + tt, p + pp + w + 1);
+							} // end window
+						} // end partial trace
+					} // end partial point
+				} // end point
+			} // end trace
 		}
-	}
+	} // end byte
+
 }
 
 void SOCPA::calculate_correlation_subkey(Array4D<RESULT_T>* corr) {

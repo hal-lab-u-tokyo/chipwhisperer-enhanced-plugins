@@ -40,7 +40,6 @@ SOCPACuda::SOCPACuda(int num_traces, int num_points, int window_size, AESLeakage
 								sum_hypothesis_square->get_size(),
 								cudaMemcpyHostToDevice));
 
-		dbg_sum_hypothesis_combined_trace = new Array4D<RESULT_T>(byte_length, NUM_GUESSES, num_points, window_size);
 
 		// init as nullptr
 		// allocated at the first call of setup_arrays becasue the size is not known at this point
@@ -124,12 +123,10 @@ void SOCPACuda::update_sum_hypothesis_trace() {
 							device_sum_hypothesis_trace,
 							sum_hypothesis_trace->get_size(),
 							cudaMemcpyDeviceToHost));
-	printf("copy back done\n");
 }
 
 
-const int sharedMemSize = (1 * 16 * 32);
-// const int threadPerBlock = 256;
+const int threadPerBlock = (4 * 16 * 8);
 
 __global__
 void sum_hypothesis_coumbined_trace_kernel(
@@ -137,103 +134,61 @@ void sum_hypothesis_coumbined_trace_kernel(
 	int *hypothetial_leakage, double *traces,
 	double *sum_hypothesis_combined_trace)
 {
-	__shared__ double cache[sharedMemSize];
-	// int dbg = threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 1 && blockIdx.y == 0;
+	__shared__ double cache[threadPerBlock];
 
-	// naive implementation
 	int point_index = threadIdx.x + blockIdx.x * blockDim.x;
 	int window_index = threadIdx.y + blockIdx.y * blockDim.y;
 
-	int cache_index = threadIdx.z + threadIdx.y * blockDim.z + threadIdx.x * blockDim.y * blockDim.z;
+	int cache_offset = threadIdx.x * blockDim.y * blockDim.z + threadIdx.y * blockDim.z;
+	int cache_index = threadIdx.z + cache_offset;
 	int trace_index = threadIdx.z;
 
-	if (point_index < num_points && point_index + window_index < num_points - 1 && window_index < window_size) {
+	if (point_index + window_index < num_points - 1 && window_index < window_size) {
 		cache[cache_index] = 0;
 		while (trace_index < num_traces) {
 			int hyp = hypothetial_leakage[trace_index];
 			cache[cache_index] += hyp * traces[trace_index * num_points + point_index + window_index + 1] *
-									traces[trace_index * num_points + point_index];
+			traces[trace_index * num_points + point_index];
 			trace_index += blockDim.z;
 		}
 	}
 	__syncthreads();
 
 	// reduction
-	// int i = blockDim.z / 2;
-	int cache_offset = threadIdx.y * blockDim.z + threadIdx.x * blockDim.y * blockDim.z;
-
-	// while (i != 0) {
-	// 	if (threadIdx.z < i) {
-	// 		cache[cache_offset + threadIdx.z] += cache[cache_offset + threadIdx.z + i];
-	// 	}
-	// 	__syncthreads();
-	// 	i /= 2;
-	// }
-
 	if (threadIdx.z == 0 &&  window_index < window_size) {
 		double sum = 0;
 		for (int i = 0; i < blockDim.z; i++) {
 			sum += cache[i + cache_offset];
 		}
-		sum_hypothesis_combined_trace[point_index * window_size + window_index] = sum; //cache[cache_offset];
+		sum_hypothesis_combined_trace[point_index * window_size + window_index] = sum;
 	}
 
 }
-#include <iostream>
 
 void SOCPACuda::update_sum_hypothesis_combined_trace()
 {
-	// SOCPA::update_sum_hypothesis_combined_trace();
 
-
-	// dim3 dimBlock(threadPerBlock);
-	// const int blocksPerGrid = imin(8, (num_traces + dimBlock.z - 1) / dimBlock.z);
-
-	// dim3 dimGrid(blocksPerGrid, window_size, num_points);
-	// double* partial_sum = new double[num_points * window_size * blocksPerGrid];
-	// double* device_partial_sum;
-	// CUDA_CHECK(cudaMalloc((void**)&device_partial_sum, sizeof(double) * num_points * window_size * blocksPerGrid));
-
-	dim3 dimBlock(1, 16, 32);
-	dim3 dimGrid((num_points + dimBlock.x - 1) / dimBlock.x, (window_size + dimBlock.y - 1) / dimBlock.y, 1);
+	dim3 dimBlock(4, 16, 8);
+	dim3 dimGrid((num_points + dimBlock.x - 1) / dimBlock.x,
+				(window_size + dimBlock.y - 1) / dimBlock.y, 1);
 
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
 			sum_hypothesis_coumbined_trace_kernel<<<dimGrid, dimBlock>>>(num_traces, num_points, window_size,
 				&device_hypothetial_leakage[byte_index * NUM_GUESSES * num_traces + guess * num_traces], device_traces,
-				&device_sum_hypothesis_combined_trace[byte_index * NUM_GUESSES * num_points * window_size + guess * num_points * window_size]);
+				device_sum_hypothesis_combined_trace);
 			auto err = cudaGetLastError();
 			if (err != cudaSuccess) {
 				throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
 			}
-			// break;
+			// copy back
+			double* dst = &(((double*)sum_hypothesis_combined_trace->get_pointer())[byte_index * NUM_GUESSES * num_points * window_size + guess * num_points * window_size]);
+			CUDA_CHECK(cudaMemcpy(dst, device_sum_hypothesis_combined_trace,
+									sizeof(double) * num_points * window_size,
+									cudaMemcpyDeviceToHost));
 		}
-		// break;
 	}
 
-	// // copy back
-	CUDA_CHECK(cudaMemcpy((double*)sum_hypothesis_combined_trace->get_pointer(),
-							device_sum_hypothesis_combined_trace,
-							sum_hypothesis_combined_trace->get_size(),
-							cudaMemcpyDeviceToHost));
-
-	// // // verify
-	// for (int window_index = 0; window_index < window_size; window_index++) {
-	// 	printf("%d: CPU %lf GPU %lf\n", window_index, sum_hypothesis_combined_trace->at(0, 0, 1, window_index), dbg_sum_hypothesis_combined_trace->at(0, 0, 1, window_index));
-	// }
-	// for (int byte_index = 0; byte_index < byte_length; byte_index++) {
-	// 	for (int guess = 0; guess < NUM_GUESSES; guess++) {
-	// 		for (int point_index = 0; point_index < num_points; point_index++) {
-	// 			for (int window_index = 0; window_index < window_size; window_index++) {
-	// 				if (dbg_sum_hypothesis_combined_trace->at(byte_index, guess, point_index, window_index) != sum_hypothesis_combined_trace->at(byte_index, guess, point_index, window_index)) {
-	// 					printf("error at byte_index=%d, guess=%d, point_index=%d, window_index=%d\n", byte_index, guess, point_index, window_index);
-	// 					printf("CPU: %f, GPU: %f\n", dbg_sum_hypothesis_combined_trace->at(byte_index, guess, point_index, window_index), sum_hypothesis_combined_trace->at(byte_index, guess, point_index, window_index));
-	// 					throw std::runtime_error("verification failed");
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
 }
 
 void SOCPACuda::setup_arrays(py::array_t<TRACE_T> &py_traces,
@@ -254,7 +209,7 @@ void SOCPACuda::setup_arrays(py::array_t<TRACE_T> &py_traces,
 
 	if (device_sum_hypothesis_combined_trace == nullptr) {
 		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_combined_trace,
-						sum_hypothesis_combined_trace->get_size()));
+						sizeof(double) * num_points * window_size));
 	}
 
 	if (device_traces == nullptr) {
@@ -265,8 +220,6 @@ void SOCPACuda::setup_arrays(py::array_t<TRACE_T> &py_traces,
 	CUDA_CHECK(cudaMemcpy(device_traces, traces->get_pointer(),
 			traces->get_size(),
 			cudaMemcpyHostToDevice));
-
-	printf("malloc and copy done\n");
 }
 
 void SOCPACuda::calculate_hypothesis()

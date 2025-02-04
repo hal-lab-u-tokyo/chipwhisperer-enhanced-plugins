@@ -48,7 +48,7 @@ protected:
 	double *device_sum_hypothesis_trace;
 
 	double *device_sum_hypothesis_combined_trace;
-	Array4D<double> *dbg_sum_hypothesis_combined_trace;
+	// ArrayD<double> *dbg_sum_hypothesis_combined_trace;
 
 	virtual void update_sum_hypothesis_trace();
 	virtual void update_sum_hypothesis_combined_trace();

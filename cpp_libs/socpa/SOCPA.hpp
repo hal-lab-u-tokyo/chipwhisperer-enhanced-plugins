@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  01-02-2025 09:07:43
-*    Last Modified: 04-02-2025 04:15:10
+*    Last Modified: 05-02-2025 08:45:43
 */
 
 
@@ -35,6 +35,9 @@ using RESULT_T = double;
 class SOCPA {
 public:
 	const int NUM_GUESSES = 256;
+	int trace_tile_size;
+	int point_tile_size;
+
 	// Constructor
 	SOCPA(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model) :
 		byte_length(byte_length), num_points(num_points), total_traces(0), model(model), window_size(window_size) {
@@ -56,6 +59,14 @@ public:
 
 
 	};
+
+	void set_point_tile_size(int size) {
+		point_tile_size = size;
+	}
+
+	void set_trace_tile_size(int size) {
+		trace_tile_size = size;
+	}
 
 	SOCPA(int byte_length, int num_points, AESLeakageModel::ModelBase *model) :
 		SOCPA(byte_length, num_points, num_points, model) {};

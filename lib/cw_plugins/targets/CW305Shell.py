@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  22-01-2025 08:34:28
-#   Last Modified: 25-01-2025 20:52:22
+#   Last Modified: 28-01-2025 08:20:17
 ###
 
 from pathlib import Path
@@ -304,6 +304,7 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
     def reset(self):
         self.reset_interface()
         self.soft_reset()
+        self.last_key = bytes()
 
     def getName(self):
         return "Base Class for CW305 Shell"

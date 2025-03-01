@@ -124,10 +124,11 @@ The driver class is [`CW305ShellExampleAES128BitRTL`](../lib/cw_plugins/targets/
 2. HLS implementation of AES-128
 The driver class is [`CW305ShellExampleAES128BitHLS`](../lib/cw_plugins/targets/CW305ShellAESExamples.py).
 
-## VexRiscv_SakuraX
-VexRiscv is a 32-bit RISC-V CPU core and [VexRiscv_SakuraX](https://github.com/hal-lab-u-tokyo/VexRiscv_SakuraX) provides an implementation of VexRiscv on the Sakura-X board.
+## VexRiscv_SCA
+VexRiscv is a 32-bit RISC-V CPU core and [VexRiscv_SCA](https://github.com/hal-lab-u-tokyo/VexRiscv_SakuraX) provides an implementations of VexRiscv for both SAKURA-X and CW305 boards.
+For more information including software development kit, test runner scripts, and so on, please refer to its repo.
 
-It is also designed based on the Sakura-X Shell, and [`SakuraXVexRISCVControlBase`](../lib//cw_plugins/targets/SakuraXVexRISCV.py) defines additional methods for controlling the CPU core, derived from `SakuraXShellControlBase`.
+The design for SAKURA-X board is also designed based on the Sakura-X Shell, and [`SakuraXVexRISCVControlBase`](../lib//cw_plugins/targets/SakuraXVexRISCV.py) defines additional methods for controlling the CPU core, derived from `SakuraXShellControlBase`.
 As described above, the derived class needs to implement the four methods `send_key`, `send_plaintext`, `run`, and `read_ciphertext`.
 
 Its constructor requires the following arguments:
@@ -155,10 +156,15 @@ The following methods are available to check buffer status
 * `get_send_buffer_bytes(self)`
 * `get_recv_buffer_bytes(self)`
 
+For CW305 board, the driver class is [`CW305VexRISCVBase`](../lib/cw_plugins/targets/CW305VexRISCV.py).
+It has almost the same methods as `SakuraXVexRISCVControlBase` except for the `_con` method arguments.
+A path to program binary file must be set to the `program` keyword argument for `_con` method, i.e., `cw.target` routine.
+
+
 ### AES example
 
 This repository includes software implementations of AES-128 encryption for VexRiscv.
-[`SakuraXVexRISCVAESExample`](../lib//cw_plugins/targets/SakuraXVexRISCVAESExample.py) is a derived class of `SakuraXShellBase`.
+[`SakuraXVexRISCVAESExample`](../lib/cw_plugins/targets/SakuraXVexRISCVAESExample.py) is a derived class of `SakuraXShellBase`.
 There are two implementations of AES-128 encryption in the repository, one is unmasked and the other is masked.
 `SakuraXVexRISCVAESExample` uses the unmasked implementation as default.
 To use the masked implementation, please set keyword argument `masked` to `True` for `con` method.
@@ -181,7 +187,10 @@ from cw_plugins.targets import SakuraXVexRISCVAESExample # <- for VexRiscv with 
 target = SakuraXShellExampleAES128BitRTL()
 scope = None # <- because oscilloscope is not used
 hwh_file = "path/to/hwh_file"
+# for SAKURA-X
 target.con(scope, serial_port="/dev/ttyUSB0", hwh_file=hwh_file)
+# for CW305, use the following line 
+# target.con(scope, bsfile="path/to/bitstream_file", hwh_file=hwh_file)
 
 # key, plaintext generator in Chipwhisperer
 ktp = cw.ktp.Basic()

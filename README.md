@@ -13,7 +13,7 @@ git clone --recursive https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-
   * SAKURA-X board configured with SASEBO-GIII sample
   * ESP32
   * [SAKURA-X shell](https://github.com/hal-lab-u-tokyo/sakura-x-shell)
-  * [VexRiscv_SakuraX](https://github.com/hal-lab-u-tokyo/VexRiscv_SakuraX)
+  * [VexRiscv_SCA](https://github.com/hal-lab-u-tokyo/VexRiscv_SCA)
   * [CW305-shell](https://github.com/hal-lab-u-tokyo/cw305-shell)
 * Capture devices
   * Keysight Infiniviion 40000 (MSO-X 4101A tested)

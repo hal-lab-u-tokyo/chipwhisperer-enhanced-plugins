@@ -18,9 +18,6 @@ class CW305VexRISCVBase(CW305ShellBase, metaclass=ABCMeta):
     SEND_BUF_DATA_ADDR = 0x8
     SEND_BUF_STAT_ADDR = 0xC
 
-    # def get_periph_address(self, name):
-    #     return self.periph_address_base + self.periph_address_offset[name]
-
     CHUNK_SIZE = 16
 
     def __init__(self):

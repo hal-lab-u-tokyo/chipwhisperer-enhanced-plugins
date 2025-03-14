@@ -10,11 +10,14 @@ git clone --recursive https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-
 
 ## Extended features
 * Target devices (See [hardware](docs/hardware.md) for details)
-  * SAKURA-X board configured with SASEBO-GIII sample
+  * SAKURA-X board configured with SASEBO-GIII sample design
   * ESP32
   * [SAKURA-X shell](https://github.com/hal-lab-u-tokyo/sakura-x-shell)
   * [VexRiscv_SCA](https://github.com/hal-lab-u-tokyo/VexRiscv_SCA)
   * [CW305-shell](https://github.com/hal-lab-u-tokyo/cw305-shell)
+  * AES Examples in [sca_design_repo](https://github.com/hal-lab-u-tokyo/sca_design_repo) based on the both shells
+    * RTL implementations and HLS implementations
+
 * Capture devices
   * Keysight Infiniviion 40000 (MSO-X 4101A tested)
   * Rigol MSO8000 (MSO8104 tested)
@@ -28,6 +31,7 @@ git clone --recursive https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-
 
 ## Contents
 * lib: python library source
+* hardware: target hardware related files and submodules
 * notebooks: Jupyter Notebook files as examples
 * udev-rules: udev rule file for devices related to side-channel attack evaluation
 * docs: documents

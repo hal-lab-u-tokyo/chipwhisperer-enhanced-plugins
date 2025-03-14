@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  25-01-2025 15:16:34
-#   Last Modified: 27-01-2025 15:07:41
+#   Last Modified: 15-03-2025 06:40:44
 ###
 
 
@@ -14,6 +14,7 @@ from Crypto.Cipher import AES
 import numpy as np
 
 from pathlib import Path
+import random
 
 import warnings
 
@@ -58,12 +59,29 @@ class CW305ShellExampleAES128BitRTL(CW305ShellAES128BitBase):
         AES128_SIZE = 0
         ENC_START_BIT = 0x1
 
+    class RSM_CORE():
+        ADDRESS_MAP = {
+            "key": 0x0,
+            "plaintext": 0x10,
+            "ciphertext": 0x20,
+            "control": 0x30,
+            "rotate": 0x34
+        }
+        KEY_READY_BIT = 0x2
+        PT_READY_BIT = 0x1
+
+    NAME_BASE_DICT = {
+        "aist": "aes128_aist_rtl",
+        "google": "aes128_googlevault_rtl",
+        "rsm": "aes128_rsm_rtl"
+    }
+
     def __init__(self):
         super().__init__()
 
 
     def _con(self, scope=None, implementation="aist", **kwargs):
-        name_base = "aes128_aist_rtl" if implementation == "aist" else "aes128_googlevault_rtl"
+        name_base = self.NAME_BASE_DICT[implementation]
 
         use_prebuilt_bitstream = False
         if "bsfile" not in kwargs:
@@ -94,6 +112,11 @@ class CW305ShellExampleAES128BitRTL(CW305ShellAES128BitBase):
             self.fpga_write(self.address_base + self.GOOGLE_CORE.ADDRESS_MAP["control"], \
                          [self.GOOGLE_CORE.AES128_SIZE << 1 ])
             self.run_impl = self.run_google_core
+        elif implementation == "rsm":
+            self.key_address = self.address_base + self.RSM_CORE.ADDRESS_MAP["key"]
+            self.pt_address = self.address_base + self.RSM_CORE.ADDRESS_MAP["plaintext"]
+            self.ct_address = self.address_base + self.RSM_CORE.ADDRESS_MAP["ciphertext"]
+            self.run_impl = self.run_rsm_core
         else:
             raise ValueError(f"Unknown implementation {implementation}")
 
@@ -109,10 +132,16 @@ class CW305ShellExampleAES128BitRTL(CW305ShellAES128BitBase):
                             [self.AIST_CORE.PT_READY_BIT])
 
     def run_google_core(self):
-        # self.fpga_write(self.address_base + self.GOOGLE_CORE.ADDRESS_MAP["control"], \
-        #                  [self.GOOGLE_CORE.ENC_START_BIT ])
         # use external trigger
         self.usb_trigger_toggle()
+
+    def run_rsm_core(self):
+        rotate = random.randint(0, 15)
+        self.fpga_write(self.address_base + self.RSM_CORE.ADDRESS_MAP["rotate"], [rotate])
+        self.fpga_write(self.address_base + self.RSM_CORE.ADDRESS_MAP["control"], \
+                         [self.RSM_CORE.KEY_READY_BIT])
+        self.fpga_write(self.address_base + self.RSM_CORE.ADDRESS_MAP["control"], \
+                            [self.RSM_CORE.PT_READY_BIT])
 
     # implement abstract methods
     def go(self):
@@ -144,6 +173,7 @@ class CW305ShellExampleAES128BitHLS(CW305ShellAES128BitBase):
         "key_offset": 0x10,
         "plaintext_offset": 0x18,
         "ciphertext_offset": 0x20,
+        "rotate": 0x28
     }
     CTRL_AP_START = 0x1
     CTRL_AP_DONE = 0x2
@@ -153,6 +183,7 @@ class CW305ShellExampleAES128BitHLS(CW305ShellAES128BitBase):
 
     def __init__(self):
         super().__init__()
+        self.rsm_impl = False
 
     def setup(self):
         super().setup()
@@ -160,22 +191,33 @@ class CW305ShellExampleAES128BitHLS(CW305ShellAES128BitBase):
         self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["plaintext_offset"], [self.plaintext_address])
         self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["ciphertext_offset"], [self.ciphertext_address])
         self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["control"], [self.CTRL_AP_CONTINUE])
-        print("setup done")
 
-    def _con(self, scope=None, **kwargs):
+    def _con(self, scope=None, implementation = "naive", **kwargs):
+
+        if implementation == "naive":
+            name_base = "aes128_hls"
+        elif implementation == "rsm":
+            name_base = "aes128_rsm_hls"
+            self.rsm_impl = True
+        else:
+            raise ValueError(f"Unknown implementation {implementation}")
 
         use_prebuilt_bitstream = False
         if "bsfile" not in kwargs:
-            kwargs["bsfile"] = Path(__file__).parent / "bitstreams" / "cw305" / "aes128_hls.bit"
+            kwargs["bsfile"] = Path(__file__).parent / "bitstreams" / "cw305" / f"{name_base}.bit"
             use_prebuilt_bitstream = True
 
         if "hwh_file" not in kwargs and use_prebuilt_bitstream:
-            kwargs["hwh_file"] = Path(__file__).parent / "hwh_files" / "cw305" / "aes128_hls.hwh"
+            kwargs["hwh_file"] = Path(__file__).parent / "hwh_files" / "cw305" / f"{name_base}.hwh"
 
 
         super()._con(scope, **kwargs)
         try:
-            self.core_address = self.memmap.AES128Encrypt_0.base
+            if implementation == "rsm":
+                self.core_address = self.memmap.RSM_AES128Encrypt_0.base
+            elif implementation == "naive":
+                self.core_address = self.memmap.AES128Encrypt.base
+
             self.bram_address = self.memmap.axi_bram_ctrl_1.base
         except AttributeError:
             warnings.warn("Error loading hardware handoff file. Using default address map.")
@@ -206,6 +248,9 @@ class CW305ShellExampleAES128BitHLS(CW305ShellAES128BitBase):
     def go(self):
         stat = self.get_status()
         if stat["ap_idle"]:
+            if self.rsm_impl:
+                rotate = random.randint(0, 15)
+                self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["rotate"], rotate)
             self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["control"], [self.CTRL_AP_START])
         else:
             raise RuntimeError("HLS IP is not idle")

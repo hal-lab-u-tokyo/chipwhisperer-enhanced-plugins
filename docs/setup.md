@@ -7,7 +7,7 @@ pip3 install .
 pip3 install -r jupyter/requirements.txt
 ```
 
-# Install toolbox packages
+# Install plugin packages
 ```
 # clone & cd to this repository
 pip3 install .

@@ -1,2 +1,2 @@
 # MSOX4104A
-ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="0957", ATTRS{idProduct}=="17b0", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0957", ATTRS{idProduct}=="17b0", MODE="0666"

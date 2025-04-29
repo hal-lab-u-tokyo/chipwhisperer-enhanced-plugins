@@ -5,7 +5,7 @@
 #    Project:       tkojima
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  16-01-2024 21:01:52
-#    Last Modified: 30-01-2025 08:06:02
+#    Last Modified: 30-04-2025 04:40:45
 #
 
 cmake_minimum_required(VERSION 3.20)
@@ -32,6 +32,15 @@ execute_process(
     PYBIND11_SITE_PACKAGES
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+if (NOT PYBIND11_SITE_PACKAGES)
+	# manually set due to isolation of virtualenv
+	if (EXISTS ${Python3_SITELIB}/pybind11)
+		set(PYBIND11_SITE_PACKAGES ${Python3_SITELIB})
+	else()
+		message(FATAL_ERROR "pybind11 not found. Please set PYBIND11_SITE_PACKAGES.")
+	endif()
+endif()
+
 find_package(pybind11 REQUIRED HINTS ${PYBIND11_SITE_PACKAGES})
 set(CMAKE_CXX_STANDARD 11)
 
@@ -75,6 +84,20 @@ if (CUDA_FOUND)
 		set(ENV{PATH} "${CUDA_TOOLKIT_ROOT_DIR}/bin:${ENV_PATH}")
 	endif()
 	enable_language(CUDA)
+	# find minimum architecture specified
+	set(NEW_CMAKE_CUDA_ARCHITECTURES "")
+	foreach(arch ${CMAKE_CUDA_ARCHITECTURES})
+		if (arch LESS 60)
+			message(WARNING "CUDA architecture ${arch} is not supported. Supported architectures are 60 or higher. Skip this architecture.")
+		else()
+			list(APPEND NEW_CMAKE_CUDA_ARCHITECTURES ${arch})
+		endif()
+	endforeach()
+	if (NOT NEW_CMAKE_CUDA_ARCHITECTURES)
+		list(APPEND NEW_CMAKE_CUDA_ARCHITECTURES 60)
+	endif()
+	set(CMAKE_CUDA_ARCHITECTURES ${NEW_CMAKE_CUDA_ARCHITECTURES})
+
 	if (OpenMP_FOUND)
 		set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${OpenMP_CXX_FLAGS}")
 		if (NOT ${HAVE_QUAD_PRECISION})

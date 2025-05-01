@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 06:33:19
-*    Last Modified: 05-02-2025 08:47:18
+*    Last Modified: 01-05-2025 08:01:33
 */
 
 
@@ -13,7 +13,6 @@
 #include <pybind11/numpy.h>
 
 #include "SOCPA.hpp"
-
 #include "AESLeakageModel.hpp"
 
 // check availability of OpenMP
@@ -23,6 +22,8 @@
 
 #include <iostream>
 #include <chrono>
+#include <sys/sysinfo.h>
+#include <algorithm>
 
 namespace py = pybind11;
 using namespace std;
@@ -34,25 +35,22 @@ py::array_t<RESULT_T> SOCPA::calculate_correlation(py::array_t<TRACE_T> &py_trac
 {
 
 	setup_arrays(py_traces, py_plaintext, py_ciphertext, py_knownkey);
-	total_traces += num_traces;
 
 	// sum up each sample of traces
-	update_sum_trace();
+	calculate_sum_trace();
 
 	// calculate hypothetical leakage from the leakage model
 	calculate_hypothesis();
 
 	// sum up the product of hypothetical leakage and traces
-	update_sum_hypothesis_trace();
-
-	// sum up the product of hypothetical leakage and paired traces
-	update_sum_hypothesis_combined_trace();
+	calculate_sum_hypothesis_trace();
 
 
-	py::array_t<RESULT_T> py_corr({byte_length, NUM_GUESSES, num_points, window_size});
-	Array4D<RESULT_T>* corr = new Array4D<RESULT_T>((RESULT_T*)py_corr.request().ptr,
-											byte_length, NUM_GUESSES, num_points, window_size);
+	py::array_t<RESULT_T> py_corr({byte_length, NUM_GUESSES, num_points});
 
+
+	Array3D<RESULT_T>* corr = new Array3D<RESULT_T>((RESULT_T*)py_corr.request().ptr,
+											byte_length, NUM_GUESSES, num_points);
 
 	// calculate correlation
 	calculate_correlation_subkey(corr);
@@ -94,8 +92,8 @@ void SOCPA::setup_arrays(py::array_t<TRACE_T> &py_traces,
 };
 
 
-void SOCPA::update_sum_trace() {
-	// update sum_trace and sum_trace_square
+void SOCPA::calculate_sum_trace() {
+	// sum up each sample of traces
 	#ifdef _OPENMP
 	#pragma omp parallel for
 	#endif
@@ -117,8 +115,8 @@ void SOCPA::update_sum_trace() {
 
 }
 
-void SOCPA::update_sum_hypothesis_trace() {
-	// update sum_hypothesis_trace
+void SOCPA::calculate_sum_hypothesis_trace() {
+	// sum up the product of hypothetical leakage and traces
 	#ifdef _OPENMP
 	#pragma omp parallel for collapse(2)
 	#endif
@@ -161,80 +159,103 @@ void SOCPA::calculate_hypothesis() {
 	}
 }
 
-void SOCPA::update_sum_hypothesis_combined_trace()
-{
+
+void SOCPA::calculate_correlation_subkey(Array3D<RESULT_T>* corr) {
+
+	/* calculation formula and symbols (s1-s13) are the same as the following paper:
+		Bottinelli, Paul, and Joppe W. Bos. "Computational aspects of correlation power analysis." Journal of Cryptographic Engineering 7 (2017): 167-181.
+	*
+	* */
+
 	// tiling parameter
 	const int tile_point = this->point_tile_size;
 	const int tile_trace = this->trace_tile_size;
 
 	#ifdef _OPENMP
-	#pragma omp parallel for collapse(4)
-	#endif
-	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
-		for (int guess = 0; guess < NUM_GUESSES; guess++) {
-			for (int t = 0; t < num_traces; t += tile_trace) {
-				for (int p = 0; p < num_points; p += tile_point) {
-					for (int pp = 0; pp < std::min(tile_point, num_points - p); pp++) {
-						for (int tt = 0; tt < std::min(tile_trace, num_traces - t); tt++) {
-							auto hyp = hypothetial_leakage->at(byte_index, guess, t + tt);
-							auto v1 = traces->at(t + tt, p + pp);
-							int end_window = std::min(window_size, num_points - p - pp - 1);
-							for (int w = 0; w < end_window; w++) {
-								sum_hypothesis_combined_trace->at(byte_index, guess, p + pp, w) += hyp * v1 * traces->at(t + tt, p + pp + w + 1);
-							} // end window
-						} // end partial trace
-					} // end partial point
-				} // end point
-			} // end trace
-		}
-	} // end byte
-
-}
-
-void SOCPA::calculate_correlation_subkey(Array4D<RESULT_T>* corr) {
-
-	/* calculation formula and symbols are the same as the following paper:
-		Bottinelli, Paul, and Joppe W. Bos. "Computational aspects of correlation power analysis." Journal of Cryptographic Engineering 7 (2017): 167-181.
-	*
-	* */
-
-	#ifdef _OPENMP
 	#pragma omp parallel for collapse(2)
 	#endif
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
-		for (int p = 0; p < num_points; p++) {
-			int end_window = std::min(num_points, p + window_size + 1);
-			for (int w = p + 1; w < end_window; w++) { 
 
-				auto s1 = (QUADFLOAT)sum_trace[p];
-				auto s6 = (QUADFLOAT)sum_trace_square[p];
-				auto s2 = (QUADFLOAT)sum_trace[w];
-				auto s8 = (QUADFLOAT)sum_trace_square[w];
-				auto s4 = (QUADFLOAT)sum_trace_x_win->at(p, w - p - 1);
-				auto s12 = (QUADFLOAT)sum_trace2_x_win->at(p, w - p - 1);
-				auto s13 = (QUADFLOAT)sum_trace_x_win2->at(p, w - p - 1);
-				auto s11 = (QUADFLOAT)sum_trace2_x_win2->at(p, w - p - 1);
+		for (int guess = 0; guess < NUM_GUESSES; guess++) {
 
-				QUADFLOAT n_lambda3 = (QUADFLOAT)total_traces * s11 - 2.0 * (s2 * s12 + s1 * s13)  +
-						(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (QUADFLOAT)total_traces -
-						3.0 * SQUARE(s1 * s2) / (QUADFLOAT)SQUARE(total_traces);
-				QUADFLOAT lambda2 = s4 - (s1 * s2)/(QUADFLOAT)total_traces;
+			auto s3 = sum_hypothesis->at(byte_index, guess);
+			auto s9 = sum_hypothesis_square->at(byte_index, guess);
 
-				for (int guess = 0; guess < NUM_GUESSES; guess++) {
-					auto s3 = sum_hypothesis->at(byte_index, guess);
-					auto s9 = sum_hypothesis_square->at(byte_index, guess);
+			// temporary storage
+			auto sum_hypothesis_combined_trace = new RESULT_T[tile_point * window_size]();
+
+			for (int tp = 0; tp < num_points; tp += tile_point) {
+
+				for (int tt = 0; tt < num_traces; tt += tile_trace) {
+
+					// sum up the product of hypothetical leakage and combined points
+					for (int pp = 0; pp < std::min(tile_point, num_points - tp); pp++) {
+						auto p = pp + tp;
+						int end_window = std::min(window_size, num_points -  p - 1);
+
+						for (int t = 0; t < std::min(tile_trace, num_traces - tt); t++) {
+							auto hyp = hypothetial_leakage->at(byte_index, guess, t + tt);
+							auto v1 = traces->at(t + tt, p);
+							for (int w = 0; w < end_window; w++) {
+								sum_hypothesis_combined_trace[pp * window_size + w]
+								 += hyp * v1 * traces->at(t + tt, p + w + 1);
+							}
+						} // end partial trace
+
+					} // end partial point
+
+				} // end trace tile
+
+				// calculate the correlation
+				for (int pp = 0; pp < std::min(tile_point, num_points - tp); pp++) {
+					auto p = pp + tp;
+					int end_window = std::min(window_size, num_points - p - 1);
+
+					auto s1 = (QUADFLOAT)sum_trace[p];
+					auto s6 = (QUADFLOAT)sum_trace_square[p];
 					auto s5 = sum_hypothesis_trace->at(byte_index, guess, p);
-					auto s7 = sum_hypothesis_trace->at(byte_index, guess, w);
-					auto s10 = sum_hypothesis_combined_trace->at(byte_index, guess, p, w - 1 - p);
 
-					QUADFLOAT n_lambda1 = (QUADFLOAT)total_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3)/ (QUADFLOAT)total_traces;
-					corr->at(byte_index, guess, p, w - 1 - p) =
-						(RESULT_T)(n_lambda1 - lambda2 * s3) /
-						std::sqrt((RESULT_T)(((n_lambda3 - SQUARE(lambda2)) * (total_traces * s9 - SQUARE(s3)))));
+					RESULT_T max_corr = 0.0;
+					int max_win = 0;
 
-				}
-			}
-		}
-	}
+					// find max correlation
+					for (int w = 0; w < end_window; w++) {
+						auto s2 = (QUADFLOAT)sum_trace[p + w + 1];
+						auto s8 = (QUADFLOAT)sum_trace_square[p + w + 1];
+						auto s4 = (QUADFLOAT)sum_trace_x_win->at(p, w);
+						auto s12 = (QUADFLOAT)sum_trace2_x_win->at(p, w);
+						auto s13 = (QUADFLOAT)sum_trace_x_win2->at(p, w);
+						auto s11 = (QUADFLOAT)sum_trace2_x_win2->at(p, w);
+						auto s7 = sum_hypothesis_trace->at(byte_index, guess, p + w + 1);
+						auto s10 = sum_hypothesis_combined_trace[pp * window_size + w];
+						QUADFLOAT n_lambda3 = (QUADFLOAT)num_traces * s11 
+									- 2.0 * (s2 * s12 + s1 * s13)  +
+									(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (QUADFLOAT)num_traces -
+									3.0 * SQUARE(s1 * s2) / (QUADFLOAT)SQUARE(num_traces);
+						QUADFLOAT lambda2 = s4 - (s1 * s2)/(QUADFLOAT)num_traces;
+						QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3)/ (QUADFLOAT)num_traces;
+						RESULT_T corr = (RESULT_T)(n_lambda1 - lambda2 * s3) /
+										std::sqrt((RESULT_T)(((n_lambda3 - SQUARE(lambda2)) * (num_traces * s9 - SQUARE(s3)))));
+						if (std::abs(corr) > std::abs(max_corr)) {
+							max_corr = corr;
+							max_win = w;
+						}
+					} // end window
+
+					// store the result
+					corr->at(byte_index, guess, p) = max_corr;
+					max_combined_offset->at(byte_index, guess, p) = max_win;
+
+				} // end partial point
+
+				// clear the temporary storage
+
+				std::fill(sum_hypothesis_combined_trace, sum_hypothesis_combined_trace + tile_point * window_size, 0.0);
+			} // end point tile
+
+			delete[] sum_hypothesis_combined_trace;
+		} // end guess
+
+	} // end byte
+
 }
-

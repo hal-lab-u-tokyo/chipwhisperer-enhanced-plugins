@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 08:00:08
-*    Last Modified: 05-02-2025 08:46:47
+*    Last Modified: 01-05-2025 05:46:46
 */
 
 
@@ -22,6 +22,7 @@ PYBIND11_MODULE(socpa_kernel, module) {
 	py::class_<SOCPA>(module, "SOCPA")
 		.def(py::init<int, int, int, AESLeakageModel::ModelBase*>())
 		.def("calculate_correlation", &SOCPA::calculate_correlation)
+		.def("get_max_combined_offset", &SOCPA::get_max_combined_offset)
 		.def("set_point_tile_size", &SOCPA::set_point_tile_size)
 		.def("set_trace_tile_size", &SOCPA::set_trace_tile_size);
 

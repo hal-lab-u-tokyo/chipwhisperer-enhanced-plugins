@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  01-02-2025 09:07:43
-*    Last Modified: 05-02-2025 08:45:43
+*    Last Modified: 02-05-2025 03:32:53
 */
 
 
@@ -17,6 +17,8 @@
 
 #include "Arrays.hpp"
 #include "AESLeakageModel.hpp"
+
+using namespace std;
 
 namespace py = pybind11;
 
@@ -32,6 +34,7 @@ using QUADFLOAT = long double;
 using TRACE_T = double;
 using RESULT_T = double;
 
+
 class SOCPA {
 public:
 	const int NUM_GUESSES = 256;
@@ -40,7 +43,7 @@ public:
 
 	// Constructor
 	SOCPA(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model) :
-		byte_length(byte_length), num_points(num_points), total_traces(0), model(model), window_size(window_size) {
+		byte_length(byte_length), num_points(num_points), model(model), window_size(window_size) {
 		// init arrays
 		sum_trace = new TRACE_T[num_points]();
 		sum_trace_square = new TRACE_T[num_points]();
@@ -50,13 +53,18 @@ public:
 
 		sum_hypothesis_trace = new Array3D<RESULT_T>(byte_length, NUM_GUESSES, num_points);
 
-		sum_hypothesis_combined_trace = new Array4D<RESULT_T>(byte_length, NUM_GUESSES, num_points, window_size);
+		py_max_comb_offset = py::array_t<unsigned int>({byte_length, NUM_GUESSES, num_points});
+		max_combined_offset = new Array3D<unsigned int>((unsigned int*)py_max_comb_offset.request().ptr,
+									 byte_length, NUM_GUESSES, num_points);
+
 
 		sum_trace_x_win = new Array2D<TRACE_T>(num_points, window_size);
 		sum_trace2_x_win = new Array2D<TRACE_T>(num_points, window_size);
 		sum_trace_x_win2 = new Array2D<TRACE_T>(num_points, window_size);
 		sum_trace2_x_win2 = new Array2D<TRACE_T>(num_points, window_size);
 
+		trace_tile_size = 64;
+		point_tile_size = 64;
 
 	};
 
@@ -76,13 +84,19 @@ public:
 								py::array_t<uint8_t> &py_ciphertext,
 								py::array_t<uint8_t> &py_knownkey);
 
+	py::array_t<unsigned int> get_max_combined_offset() {
+		return py_max_comb_offset;
+	}
+
+private:
+	py::array_t<unsigned int> py_max_comb_offset;
+
 protected:
 	int window_size;
 	int byte_length;
 	int num_traces;
 	int num_points;
 	int num_guesses;
-	int total_traces;
 	AESLeakageModel::ModelBase *model;
 
 	Array2D<TRACE_T> *traces; // [0:num_traces][0:num_points]
@@ -101,7 +115,7 @@ protected:
 
 	Array3D<RESULT_T> *sum_hypothesis_trace; // [0:byte_length][0:num_guesses][0:num_points][0:window_size]
 
-	Array4D<RESULT_T> *sum_hypothesis_combined_trace; // [0:byte_length][0:num_guesses][0:num_points][0:window_size]
+	Array3D<unsigned int> *max_combined_offset; // [0:byte_length][0:num_guesses][0:num_points]
 
 	// combined traces
 	Array2D<TRACE_T> *sum_trace_x_win; // [0:num_points][0:window_size]
@@ -109,11 +123,10 @@ protected:
 	Array2D<TRACE_T> *sum_trace_x_win2; // [0:num_points][0:window_size]
 	Array2D<TRACE_T> *sum_trace2_x_win2; // [0:num_points][0:window_size]
 
-	virtual void update_sum_trace();
+	virtual void calculate_sum_trace();
 	virtual void calculate_hypothesis();
-	virtual void update_sum_hypothesis_trace();
-	virtual void update_sum_hypothesis_combined_trace();
-	virtual void calculate_correlation_subkey(Array4D<RESULT_T>* corr);
+	virtual void calculate_sum_hypothesis_trace();
+	virtual void calculate_correlation_subkey(Array3D<RESULT_T>* corr);
 
 
 	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,

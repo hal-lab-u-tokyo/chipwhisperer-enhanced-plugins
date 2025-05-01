@@ -5,14 +5,15 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 09:07:18
-#   Last Modified: 03-02-2025 09:18:55
+#   Last Modified: 02-05-2025 04:00:48
 ###
 
-
+from chipwhisperer.common.utils.parameter import setupSetParam
 from chipwhisperer.analyzer.attacks._base import AttackBaseClass
 from chipwhisperer.analyzer.attacks.algorithmsbase import AlgorithmsBase
 from chipwhisperer.analyzer.attacks.models.base import ModelsBase
 import chipwhisperer as cw
+from warnings import warn
 
 import numpy as np
 
@@ -34,6 +35,9 @@ class SOCPAAlogrithm(AlgorithmsBase):
     def get_window_size(self):
         return self._window_size
 
+    def set_reporting_interval(self, ri):
+        warn("Reporting interval is not used in SOCPA")
+
     def setModel(self, model):
         self.model = model
         if model:
@@ -49,6 +53,7 @@ class SOCPAAlogrithm(AlgorithmsBase):
         numtraces = tracerange[1] - tracerange[0]
         numpoints = pointRange[1] - pointRange[0]
 
+
         if self._window_size > numpoints:
             raise ValueError("Window size cannot be greater than number of points in trace")
 
@@ -58,41 +63,33 @@ class SOCPAAlogrithm(AlgorithmsBase):
 
         socpa = self.getSoCpaKernel(byte_len, numpoints, model)
 
-        tstart = 0
-        tend = self._reportingInterval
+        trange = range(0, numtraces)
+        part_trace = np.array([traceSource.get_trace(t + tracerange[0])[pointRange[0]:pointRange[1]] for t in trange])
+        part_textin = np.array([traceSource.get_textin(t + tracerange[0]) for t in trange])
+        if type(traceSource.get_textout(0)) == bytes:
+            part_textout = np.array([np.frombuffer(traceSource.get_textout(t + tracerange[0]), dtype=np.uint8) for t in trange])
+        else:
+            part_textout = np.array([traceSource.get_textout(t + tracerange[0]) for t in trange])
 
-        while tstart < numtraces:
-            if tend > numtraces:
-                tend = numtraces
+        part_knownkey = np.array([traceSource.get_known_key(t + tracerange[0]) for t in trange])
 
-            if tstart > numtraces:
-                tstart = numtraces
+        # register known key
+        if part_knownkey[0] is not None:
+            self.stats.set_known_key(self.process_known_key(part_knownkey[0]))
 
-            trange = range(tstart, tend)
-            part_trace = np.array([traceSource.get_trace(t + tracerange[0])[pointRange[0]:pointRange[1]] for t in trange])
-            part_textin = np.array([traceSource.get_textin(t + tracerange[0]) for t in trange])
-            if type(traceSource.get_textout(0)) == bytes:
-                part_textout = np.array([np.frombuffer(traceSource.get_textout(t + tracerange[0]), dtype=np.uint8) for t in trange])
-            else:
-                part_textout = np.array([traceSource.get_textout(t + tracerange[0]) for t in trange])
+        # run c++ library
+        corr = socpa.calculate_correlation(part_trace, part_textin, part_textout, part_knownkey)
+        max_conb_offset = socpa.get_max_combined_offset()
 
-            part_knownkey = np.array([traceSource.get_known_key(t + tracerange[0]) for t in trange])
+        # save statistics
+        for bnum in self.brange:
+            self.stats.store_correlation(bnum, corr[bnum], max_conb_offset[bnum])
 
-            # run c++ library
-            corr = socpa.calculate_correlation(part_trace, part_textin, part_textout, part_knownkey)
+        del part_trace, part_textin, part_textout, part_knownkey
 
-            # save statistics
-            for bnum in self.brange:
-                self.stats.update_subkey(bnum, corr[bnum], tnum=tend)
-
-            tend += self._reportingInterval
-            tstart += self._reportingInterval
-
-            del part_trace, part_textin, part_textout, part_knownkey
-
-            # Run callback
-            if self.sr:
-                self.sr()
+        # Run callback
+        if self.sr:
+            self.sr()
 
         # del socpa
         del socpa
@@ -169,15 +166,10 @@ class SOCPA(AttackBaseClass):
     def results(self):
         return self.getStatistics()
 
-    @property
-    def reporting_interval(self):
-        return self.get_reporting_interval()
-
     def process_traces(self, callback=None):
 
         self.attack.setModel(self.attackModel)
         self.attack.get_statistics().clear()
-        self.attack.setReportingInterval(self.get_reporting_interval())
 
         self.attack.setTargetSubkeys(self.get_target_subkeys())
         self.attack.setStatsReadyCallback(callback)
@@ -188,4 +180,15 @@ class SOCPA(AttackBaseClass):
         return self.attack.get_statistics()
 
 
+    def run(self, callback=None):
+        """ Runs the attack
 
+        Args:
+            callback (function(), optional): Callback to call every update
+                interval. No arguments are passed to callback. Defaults to None.
+
+        Returns:
+            Results, the results of the attack. See documentation
+            for Results for more details.
+        """
+        return self.process_traces(callback)

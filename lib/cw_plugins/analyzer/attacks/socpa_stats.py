@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 08:21:46
-#   Last Modified: 01-02-2025 09:02:32
+#   Last Modified: 01-05-2025 05:51:47
 ###
 
 
@@ -22,15 +22,14 @@ class SOCPAResults(object):
 
     def clear(self):
         self.corr = [None] * self.num_subkeys
+        self.max_comb_offset = [None] * self.num_subkeys
 
         # for calculated result cache
         ### maxes[byte_index][rank] contatins [hypothesis key, p0, p1, correlation]
-        self.maxes = [np.zeros(self.num_perms, dtype=[('hyp', 'i2'), ('point', 'i4'), ('corr', 'f8')]) for _ in range(self.num_subkeys) ]
-        self.max_pos = [np.zeros((self.num_perms, 2), dtype=np.uint)] * self.num_subkeys
+        self.maxes = [np.zeros(self.num_perms, dtype=[('hyp', 'i2'), ('point', 'i4', (2,)), ('corr', 'f8')]) for _ in range(self.num_subkeys) ]
         self.max_ready = [False]*self.num_subkeys
 
         self.pge = [self.num_perms - 1] * self.num_subkeys
-
 
 
     def __str__(self):
@@ -40,16 +39,17 @@ class SOCPAResults(object):
         for i,result in enumerate(guesses):
             # p0, p1 = result["pos"]
             hyp = result["guess"]
-            pos = self.max_pos[i][hyp]
+            pos = result["pos"]
             ret += f"\t{i:02d}\t0x{hyp:02X}\t({pos[0]:4d},{pos[1]:4d})\t{result['correlation']:7.5f}\t\t{result['pge']}\n"
         return ret
 
 
-    def update_subkey(self, bnum, data, tnum):
+    def store_correlation(self, bnum, corr, max_conb_pos):
         """
         Update the subkey with new data
         """
-        self.corr[bnum] = data[:]
+        self.corr[bnum] = corr[:]
+        self.max_comb_offset[bnum] = max_conb_pos[:]
         # new data is added, so we need to recalculate the maximums
         self.max_ready[bnum] = False
 
@@ -65,7 +65,7 @@ class SOCPAResults(object):
             guess['guess'] = subkey_result[0]["hyp"]
             guess['correlation'] = subkey_result[0]["corr"]
             guess['pge'] = self.pge[i]
-            guess["pos"] = self.max_pos[i][guess['guess']]
+            guess["pos"] = subkey_result[0]["point"]
             guess_list.append(guess)
 
         return guess_list
@@ -79,29 +79,19 @@ class SOCPAResults(object):
 
             for hyp in range(self.num_perms):
                 # 2D array [0:num_points][0:num_window]
-                corr = self.corr[byte_index][hyp]
-
                 if use_absolute:
-                    # reduction along the window axis
-                    max_corr_window = np.nanmax(np.fabs(corr), axis=1)
-                    max_win_pos = np.nanargmax(np.fabs(corr), axis=1)
+                    corr = np.abs(self.corr[byte_index][hyp])
                 else:
-                    # reduction along the window axis
-                    max_corr_window = np.nanmax(corr, axis=1)
-                    max_win_pos = np.nanargmax(corr, axis=1)
+                    corr = self.corr[byte_index][hyp]
 
+                max_sample_pos = np.nanargmax(corr)
+                max_corr =corr[max_sample_pos]
+                offset = self.max_comb_offset[byte_index][hyp][max_sample_pos]
 
-                # reduction along the trace sample axis
-                max_corr = np.nanmax(max_corr_window)
-                max_sample_pos = np.nanargmax(max_corr_window)
-
-                # max combine point
-                max_comb_point = max_win_pos[max_sample_pos] + max_sample_pos + 1
 
                 self.maxes[byte_index][hyp]["hyp"] = hyp
                 self.maxes[byte_index][hyp]["corr"] = max_corr
-                self.maxes[byte_index][hyp]["point"] = max_sample_pos
-                self.max_pos[byte_index][hyp] = (max_sample_pos, max_comb_point)
+                self.maxes[byte_index][hyp]["point"] = (max_sample_pos, max_sample_pos + 1 + offset)
 
             self.maxes[byte_index][::-1].sort(order='corr')
             self.max_ready[byte_index] = True

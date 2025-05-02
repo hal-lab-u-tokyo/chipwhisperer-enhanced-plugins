@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:30
-*    Last Modified: 05-05-2024 19:56:26
+*    Last Modified: 02-05-2025 09:43:30
 */
 
 
@@ -172,6 +172,7 @@ void FastCPAOpenCLBase::calculate_hypothesis()
 void FastCPAOpenCLBase::run_sum_hypothesis_kernel()
 {
 	cl_int err;
+	size_t local_work_size[2] = {4, 8};
 	size_t global_work_size[2] = {(size_t)byte_length, (size_t)(NUM_GUESSES)};
 
 	// set kernel arguments
@@ -185,7 +186,7 @@ void FastCPAOpenCLBase::run_sum_hypothesis_kernel()
 	clSetKernelArg(sum_hypothesis_kernel, 5, sizeof(cl_mem),
 					&cl_device_sum_hypothesis_square);
 	err = clEnqueueNDRangeKernel(command_queue, sum_hypothesis_kernel,
-								2, nullptr, global_work_size, nullptr,
+								2, nullptr, global_work_size, local_work_size,
 								0, nullptr, nullptr);
 	if (err != CL_SUCCESS) {
 		throw runtime_error("Error: Failed to execute kernel \"sum_hypothesis_kernel\" ("
@@ -197,8 +198,16 @@ void FastCPAOpenCLBase::run_sum_hypothesis_kernel()
 void FastCPAOpenCLBase::run_sum_hypothesis_trace_kernel()
 {
 	cl_int err;
+
+	const int local_guess_size = 8;
+	const int local_point_size = 32;
+	size_t local_work_size[3] = {1, local_guess_size, local_point_size};
+
+	size_t ceiled_num_points = ((num_points + local_point_size - 1) / local_point_size) * local_point_size;
+
 	size_t global_work_size[3] =
-		{(size_t)byte_length, (size_t)NUM_GUESSES, (size_t)num_points};
+		{(size_t)byte_length, (size_t)NUM_GUESSES, (size_t)ceiled_num_points};
+
 
 	clSetKernelArg(sum_hypothesis_trace_kernel, 0, sizeof(int), &byte_length);
 	clSetKernelArg(sum_hypothesis_trace_kernel, 1, sizeof(int), &NUM_GUESSES);
@@ -212,7 +221,7 @@ void FastCPAOpenCLBase::run_sum_hypothesis_trace_kernel()
 					&cl_device_sum_hypothesis_trace);
 
 	err = clEnqueueNDRangeKernel(command_queue, sum_hypothesis_trace_kernel,
-								3, nullptr, global_work_size, nullptr,
+								3, nullptr, global_work_size, local_work_size,
 								0, nullptr, nullptr);
 	if (err != CL_SUCCESS) {
 		throw runtime_error("Error: Failed to execute kernel \"sum_hypothesis_trace_kernel\" ("

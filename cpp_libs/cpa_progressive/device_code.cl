@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:30:39
-*    Last Modified: 30-01-2024 12:30:41
+*    Last Modified: 02-05-2025 09:50:28
 */
 
 #ifndef OCL_SUM_HYPOTHESIS
@@ -47,18 +47,20 @@ OCL_SUM_HYPOTHESIS_TRACE(
 		__global double* traces,
 		__global double* sum_hypothesis_trace
 	) {
+
 		int byte_index = get_global_id(0);
 		int guess = get_global_id(1);
 		int point = get_global_id(2);
 
-		double sum = 0;
-		for (int trace = 0; trace < num_traces; trace++) {
-			int hyp = hypothetial_leakage[byte_index * num_guess * num_traces + guess * num_traces + trace];
-			double trace_value = traces[trace * num_points + point];
-			sum += hyp * trace_value;
+		if (point < num_points) {
+			double sum = 0;
+			for (int trace = 0; trace < num_traces; trace++) {
+				int hyp = hypothetial_leakage[byte_index * num_guess * num_traces + guess * num_traces + trace];
+				double trace_value = traces[trace * num_points + point];
+				sum += hyp * trace_value;
+			}
+			sum_hypothesis_trace[byte_index * num_guess * num_points + guess * num_points + point] += sum;
 		}
-		sum_hypothesis_trace[byte_index * num_guess * num_points + guess * num_points + point] += sum;
-
 	}
 )
 #undef OCL_SUM_HYPOTHESIS_TRACE
@@ -119,17 +121,18 @@ OCL_SUM_HYPOTHESIS_TRACE_FP32(
 		int guess = get_global_id(1);
 		int point = get_global_id(2);
 
-		float2 sum = { 0, 0 };
-		for (int trace = 0; trace < num_traces; trace++) {
-			int hyp = hypothetial_leakage[byte_index * num_guess * num_traces + guess * num_traces + trace];
-			float2 trace_value = traces[trace * num_points + point];
-			float2 prod = df64_mul((float2)((float)hyp, 0), trace_value);
-			sum = df64_add(sum, prod);
+		if (point < num_points) {
+			float2 sum = { 0, 0 };
+			for (int trace = 0; trace < num_traces; trace++) {
+				int hyp = hypothetial_leakage[byte_index * num_guess * num_traces + guess * num_traces + trace];
+				float2 trace_value = traces[trace * num_points + point];
+				float2 prod = df64_mul((float2)((float)hyp, 0), trace_value);
+				sum = df64_add(sum, prod);
+			}
+			// sum_hypothesis_trace[byte_index * num_guess * num_points + guess * num_points + point] += sum;
+			int index = byte_index * num_guess * num_points + guess * num_points + point;
+			sum_hypothesis_trace[index] = df64_add(sum_hypothesis_trace[index], sum);
 		}
-		// sum_hypothesis_trace[byte_index * num_guess * num_points + guess * num_points + point] += sum;
-		int index = byte_index * num_guess * num_points + guess * num_points + point;
-		sum_hypothesis_trace[index] = df64_add(sum_hypothesis_trace[index], sum);
-
 	}
 )
 #undef OCL_SUM_HYPOTHESIS_TRACE_FP32

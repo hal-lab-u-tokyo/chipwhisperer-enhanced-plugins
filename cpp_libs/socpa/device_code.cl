@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:30:39
-*    Last Modified: 03-05-2025 10:14:03
+*    Last Modified: 03-05-2025 14:00:58
 */
 
 #ifndef OCL_SUM_HYPOTHESIS
@@ -116,7 +116,7 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE(
 		do {
 			u_old = *uaddr; // unsafe load
 			desired = as_double(u_old) + val;
-		} while (atomic_cmpxchg(uaddr, u_old, as_ulong(desired)) != u_old);
+		} while (atom_cmpxchg(uaddr, u_old, as_ulong(desired)) != u_old);
 	}
 
 	__kernel void sum_hypothesis_combined_trace_kernel(

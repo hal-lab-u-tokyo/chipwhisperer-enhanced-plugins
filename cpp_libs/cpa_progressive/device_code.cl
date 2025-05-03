@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:30:39
-*    Last Modified: 02-05-2025 09:50:28
+*    Last Modified: 02-05-2025 10:01:39
 */
 
 #ifndef OCL_SUM_HYPOTHESIS
@@ -64,7 +64,6 @@ OCL_SUM_HYPOTHESIS_TRACE(
 	}
 )
 #undef OCL_SUM_HYPOTHESIS_TRACE
-
 
 #ifndef OCL_SUM_HYPOTHESIS_TRACE_FP32
 #define OCL_SUM_HYPOTHESIS_TRACE_FP32(...)

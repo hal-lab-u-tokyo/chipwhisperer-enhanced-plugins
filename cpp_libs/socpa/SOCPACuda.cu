@@ -232,7 +232,7 @@ void sum_hypothesis_coumbined_trace_kernel(
 	double *sum_hypothesis_combined_trace)
 {
 	__shared__ double trace_cache[trace_per_block][point_per_block + 1];
-	__shared__ int hyp_cache[trace_per_block];
+	__shared__ double hyp_cache[trace_per_block];
 
 	int point_offset = blockIdx.z * blockDim.z + threadIdx.z;
 	int point_index = point_offset + start_point;
@@ -249,7 +249,7 @@ void sum_hypothesis_coumbined_trace_kernel(
 			trace_cache[threadIdx.y][threadIdx.z] = traces[trace_index * num_points + point_index];
 		}
 		if (threadIdx.z == 0) {
-			hyp_cache[threadIdx.y] =  (trace_index < num_traces) ? hypothetial_leakage[trace_index] : 0;
+			hyp_cache[threadIdx.y] =  (trace_index < num_traces) ? (double)hypothetial_leakage[trace_index] : 0;
 		}
 		__syncthreads();
 

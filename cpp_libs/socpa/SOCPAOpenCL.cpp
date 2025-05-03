@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  03-05-2025 05:56:52
-*    Last Modified: 03-05-2025 10:17:12
+*    Last Modified: 03-05-2025 14:22:07
 */
 
 
@@ -79,6 +79,11 @@ SOCPAOpenCLBase::SOCPAOpenCLBase(int byte_length, int num_points, int window_siz
 		throw runtime_error("Error: Failed to get device info ("
 							+ to_string(err) + ")");
 	}
+	// get max group size
+	err = clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE,
+							sizeof(max_group_size), &max_group_size, nullptr);
+
+	sqrt_max_group_size = static_cast<size_t>(std::sqrt(max_group_size));
 
 	// determine tile size no to ocupy more than 50% of the global memory for the temporary array
 	point_tile_size = 1 << static_cast<int>(std::ceil(std::log2(num_points)));
@@ -88,9 +93,6 @@ SOCPAOpenCLBase::SOCPAOpenCLBase(int byte_length, int num_points, int window_siz
 	}
 
 	point_tile_size = std::min(point_tile_size, num_points);
-
-	printf("Device global memory size: %zu\n", global_mem_size);
-	printf("Device local memory size: %zu\n", local_mem_size);
 
 	// create command queue
 #ifdef __APPLE__
@@ -272,8 +274,13 @@ void SOCPAOpenCLBase::calculate_sum_hypothesis_trace()
 
 	cl_int err;
 
-	const int local_guess_size = 8;
-	const int local_point_size = 32;
+	size_t local_guess_size = 8;
+	size_t local_point_size = 32;
+	// check if group size does not exceed the max group size
+	while (local_guess_size * local_point_size > max_group_size) {
+		local_point_size /= 2;
+	}
+
 	size_t local_work_size[3] = {1, local_guess_size, local_point_size};
 
 	size_t ceiled_num_points = ((num_points + local_point_size - 1) / local_point_size) * local_point_size;
@@ -312,11 +319,13 @@ void SOCPAOpenCLBase::calculate_sum_trace()
 {
 
 	cl_int err;
-	size_t local_work_size[2] = {32, 32};
+	size_t work_size = min(sqrt_max_group_size, (size_t)16);
+	size_t local_work_size[2] = {sqrt_max_group_size, sqrt_max_group_size};
 	size_t ceiled_num_points = ((num_points + local_work_size[1] - 1) / local_work_size[1]) * local_work_size[1];
 	size_t ceiled_window_size = ((window_size + local_work_size[0] - 1) / local_work_size[0]) * local_work_size[0];
 
 	size_t global_work_size[2] = {(size_t)ceiled_num_points, (size_t)ceiled_window_size};
+
 	clSetKernelArg(sum_trace_kernel, 0, sizeof(int), &num_traces);
 	clSetKernelArg(sum_trace_kernel, 1, sizeof(int), &num_points);
 	clSetKernelArg(sum_trace_kernel, 2, sizeof(int), &window_size);
@@ -334,6 +343,9 @@ void SOCPAOpenCLBase::calculate_sum_trace()
 								2, nullptr, global_work_size, local_work_size,
 								0, nullptr, nullptr);
 	if (err != CL_SUCCESS) {
+		//get log
+		size_t log_size;
+
 		throw runtime_error("Error: Failed to execute kernel \"sum_trace_kernel\" ("
 							+ to_string(err) + ")");
 	}
@@ -367,13 +379,19 @@ void SOCPAOpenCLBase::calculate_sum_trace()
 	clFinish(command_queue);
 }
 
-const int trace_per_block = 16;
-const int point_per_block = 32;
-const int window_per_block = 16;
+
 
 #include <chrono>
 void SOCPAOpenCLBase::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 {
+	size_t trace_per_block = 16;
+	size_t point_per_block = 32;
+	size_t window_per_block = 16;
+
+	// check if group size does not exceed the max group size
+	while (window_per_block * point_per_block > max_group_size) {
+		point_per_block /= 2;
+	}
 
 	cl_int err;
 	// threads size

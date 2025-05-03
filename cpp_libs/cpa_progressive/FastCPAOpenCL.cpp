@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:31:30
-*    Last Modified: 02-05-2025 09:43:30
+*    Last Modified: 03-05-2025 16:15:04
 */
 
 
@@ -41,6 +41,13 @@ FastCPAOpenCLBase::FastCPAOpenCLBase(int num_traces, int num_points, AESLeakageM
 	platform_id = get_target_platform();
 	// get device
 	device_id = get_target_device(platform_id);
+
+
+	// get max group size
+	err = clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE,
+							sizeof(max_group_size), &max_group_size, nullptr);
+
+	sqrt_max_group_size = static_cast<size_t>(std::sqrt(max_group_size));
 
 	// create context
 	context = clCreateContext(nullptr, 1, &device_id, nullptr, nullptr, &err);
@@ -199,8 +206,13 @@ void FastCPAOpenCLBase::run_sum_hypothesis_trace_kernel()
 {
 	cl_int err;
 
-	const int local_guess_size = 8;
-	const int local_point_size = 32;
+	size_t local_guess_size = 8;
+	size_t local_point_size = 32;
+	// check if group size does not exceed the max group size
+	while (local_guess_size * local_point_size > max_group_size) {
+		local_point_size /= 2;
+	}
+
 	size_t local_work_size[3] = {1, local_guess_size, local_point_size};
 
 	size_t ceiled_num_points = ((num_points + local_point_size - 1) / local_point_size) * local_point_size;

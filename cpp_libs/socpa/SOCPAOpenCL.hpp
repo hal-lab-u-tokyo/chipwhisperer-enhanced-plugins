@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  03-05-2025 05:56:44
-*    Last Modified: 03-05-2025 08:46:56
+*    Last Modified: 03-05-2025 14:14:02
 */
 
 #ifndef SOCPAOPENCL_H
@@ -75,8 +75,11 @@ protected:
 	cl_platform_id platform_id;
 	cl_device_id device_id;
 
+	// device param
 	size_t local_mem_size;
 	size_t global_mem_size;
+	size_t max_group_size;
+	size_t sqrt_max_group_size;
 
 	virtual const char** get_sum_trace_kernel_code() { return &sum_trace_kernel_code; }
 	virtual const char** get_sum_hypothesis_kernel_code() { return &sum_hypothesis_kernel_code; }

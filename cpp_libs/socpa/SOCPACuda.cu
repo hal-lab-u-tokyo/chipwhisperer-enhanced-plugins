@@ -28,6 +28,7 @@ namespace py = pybind11;
 SOCPACuda::SOCPACuda(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model) :
 	SOCPA(byte_length, num_points, window_size, model)
 {
+		// get device properties
 		cudaDeviceProp prop;
 		int device;
 		cudaGetDevice(&device);
@@ -35,6 +36,7 @@ SOCPACuda::SOCPACuda(int byte_length, int num_points, int window_size, AESLeakag
 		shared_mem_per_sm = prop.sharedMemPerMultiprocessor;
 		global_mem_capacity = prop.totalGlobalMem;
 
+		// determine tile size no to ocupy more than 50% of the global memory for the temporary array
 		point_tile_size = 1 << static_cast<int>(std::ceil(std::log2(num_points)));
 
 		while ((sizeof(double) * point_tile_size * num_points) > (global_mem_capacity / 2)) {
@@ -44,7 +46,7 @@ SOCPACuda::SOCPACuda(int byte_length, int num_points, int window_size, AESLeakag
 		point_tile_size = std::min(point_tile_size, num_points);
 
 
-
+		// allocate memory on the GPU
 		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis,
 					sizeof(int64_t) * byte_length * NUM_GUESSES));
 		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_square,
@@ -86,8 +88,8 @@ void sum_hypothesis_kernel(int byte_length, int num_guess, int num_traces,
 			sum_hyp += hyp;
 			sum_hyp_square += hyp * hyp;
 		}
-		sum_hypothesis[byte_index * num_guess + guess] += sum_hyp;
-		sum_hypothesis_square[byte_index * num_guess + guess] += sum_hyp_square;
+		sum_hypothesis[byte_index * num_guess + guess] = sum_hyp;
+		sum_hypothesis_square[byte_index * num_guess + guess] = sum_hyp_square;
 	}
 }
 
@@ -106,7 +108,7 @@ void sum_hypothesis_trace_kernel(int byte_length, int num_guess,
 			int hyp = hypothetial_leakage[byte_index * num_guess * num_traces + guess * num_traces + trace_index];
 			sum += hyp * traces[trace_index * num_points + point_index];
 		}
-		sum_hypothesis_trace[byte_index * num_guess * num_points + guess * num_points + point_index] += sum;
+		sum_hypothesis_trace[byte_index * num_guess * num_points + guess * num_points + point_index] = sum;
 	}
 
 }
@@ -169,10 +171,10 @@ void sum_trace_kernel(int num_traces, int num_points, int window_size, double *t
 			partial_sum_trace_x_win2 += v1 * v2 * v2;
 			partial_sum_trace2_x_win2 += v1 * v1 * v2 * v2;
 		}
-		sum_trace_x_win[point_index * window_size + window_index] += partial_sum_trace_x_win;
-		sum_trace2_x_win[point_index * window_size + window_index] += partial_sum_trace2_x_win;
-		sum_trace_x_win2[point_index * window_size + window_index] += partial_sum_trace_x_win2;
-		sum_trace2_x_win2[point_index * window_size + window_index] += partial_sum_trace2_x_win2;
+		sum_trace_x_win[point_index * window_size + window_index] = partial_sum_trace_x_win;
+		sum_trace2_x_win[point_index * window_size + window_index] = partial_sum_trace2_x_win;
+		sum_trace_x_win2[point_index * window_size + window_index] = partial_sum_trace_x_win2;
+		sum_trace2_x_win2[point_index * window_size + window_index] = partial_sum_trace2_x_win2;
 	}
 }
 
@@ -262,7 +264,7 @@ void sum_hypothesis_coumbined_trace_kernel(
 	}
 }
 
-
+#include <chrono>
 void SOCPACuda::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 {
 
@@ -296,12 +298,12 @@ void SOCPACuda::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 				if (err != cudaSuccess) {
 					throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
 				}
-
 				// copy back
 				CUDA_CHECK(cudaMemcpy(sum_hypothesis_combined_trace,
 										device_sum_hypothesis_combined_trace,
 										sizeof(double) * point_tile_size * window_size,
 										cudaMemcpyDeviceToHost));
+
 
 				// calculate correlation
 				#ifdef _OPENMP

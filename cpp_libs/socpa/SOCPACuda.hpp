@@ -64,7 +64,7 @@ protected:
 	double *device_sum_hypothesis_combined_trace;
 
 	virtual void calculate_sum_hypothesis_trace();
-	// virtual void update_sum_hypothesis_combined_trace();
+
 	virtual void calculate_hypothesis();
 	virtual void calculate_sum_trace();
 

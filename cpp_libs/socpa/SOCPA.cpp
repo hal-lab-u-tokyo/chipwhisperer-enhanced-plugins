@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 06:33:19
-*    Last Modified: 01-05-2025 08:01:33
+*    Last Modified: 03-05-2025 10:05:40
 */
 
 
@@ -166,7 +166,7 @@ void SOCPA::calculate_correlation_subkey(Array3D<RESULT_T>* corr) {
 		Bottinelli, Paul, and Joppe W. Bos. "Computational aspects of correlation power analysis." Journal of Cryptographic Engineering 7 (2017): 167-181.
 	*
 	* */
-
+	printf("Calculating correlation... on CPU\n");
 	// tiling parameter
 	const int tile_point = this->point_tile_size;
 	const int tile_trace = this->trace_tile_size;
@@ -212,8 +212,8 @@ void SOCPA::calculate_correlation_subkey(Array3D<RESULT_T>* corr) {
 					int end_window = std::min(window_size, num_points - p - 1);
 
 					auto s1 = (QUADFLOAT)sum_trace[p];
-					auto s6 = (QUADFLOAT)sum_trace_square[p];
 					auto s5 = sum_hypothesis_trace->at(byte_index, guess, p);
+					auto s6 = (QUADFLOAT)sum_trace_square[p];
 
 					RESULT_T max_corr = 0.0;
 					int max_win = 0;
@@ -221,13 +221,14 @@ void SOCPA::calculate_correlation_subkey(Array3D<RESULT_T>* corr) {
 					// find max correlation
 					for (int w = 0; w < end_window; w++) {
 						auto s2 = (QUADFLOAT)sum_trace[p + w + 1];
-						auto s8 = (QUADFLOAT)sum_trace_square[p + w + 1];
 						auto s4 = (QUADFLOAT)sum_trace_x_win->at(p, w);
+						auto s7 = sum_hypothesis_trace->at(byte_index, guess, p + w + 1);
+						auto s8 = (QUADFLOAT)sum_trace_square[p + w + 1];
+						auto s10 = sum_hypothesis_combined_trace[pp * window_size + w];
+						auto s11 = (QUADFLOAT)sum_trace2_x_win2->at(p, w);
 						auto s12 = (QUADFLOAT)sum_trace2_x_win->at(p, w);
 						auto s13 = (QUADFLOAT)sum_trace_x_win2->at(p, w);
-						auto s11 = (QUADFLOAT)sum_trace2_x_win2->at(p, w);
-						auto s7 = sum_hypothesis_trace->at(byte_index, guess, p + w + 1);
-						auto s10 = sum_hypothesis_combined_trace[pp * window_size + w];
+
 						QUADFLOAT n_lambda3 = (QUADFLOAT)num_traces * s11 
 									- 2.0 * (s2 * s12 + s1 * s13)  +
 									(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (QUADFLOAT)num_traces -
@@ -236,6 +237,8 @@ void SOCPA::calculate_correlation_subkey(Array3D<RESULT_T>* corr) {
 						QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3)/ (QUADFLOAT)num_traces;
 						RESULT_T corr = (RESULT_T)(n_lambda1 - lambda2 * s3) /
 										std::sqrt((RESULT_T)(((n_lambda3 - SQUARE(lambda2)) * (num_traces * s9 - SQUARE(s3)))));
+
+						// check if the correlation is maximum
 						if (std::abs(corr) > std::abs(max_corr)) {
 							max_corr = corr;
 							max_win = w;

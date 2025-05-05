@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 09:07:18
-#   Last Modified: 02-05-2025 04:00:48
+#   Last Modified: 06-05-2025 06:33:13
 ###
 
 from chipwhisperer.common.utils.parameter import setupSetParam
@@ -103,6 +103,26 @@ class SOCPAAlogrithmCuda(SOCPAAlogrithm):
         from .cpa_algorithms.socpa_kernel import SOCPA
         from .cpa_algorithms.socpa_cuda_kernel import SOCPACuda
         return SOCPACuda(byte_len, numpoints, self._window_size, model)
+
+class SOCPAAlogrithmOpenCL(SOCPAAlogrithm):
+    """
+    Second Order CPA Attack with CUDA
+    """
+
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCL
+        return SOCPAOpenCL(byte_len, numpoints, self._window_size, model)
+
+class SOCPAAlogrithmOpenCLFP32(SOCPAAlogrithm):
+    """
+    Second Order CPA Attack with CUDA
+    """
+
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCLFP32
+        return SOCPAOpenCLFP32(byte_len, numpoints, self._window_size, model)
 
 class SOCPA(AttackBaseClass):
     """Second Order CPA Attack"""

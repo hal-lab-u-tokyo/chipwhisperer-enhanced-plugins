@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 06:33:19
-*    Last Modified: 03-05-2025 10:05:40
+*    Last Modified: 06-05-2025 08:11:52
 */
 
 
@@ -166,7 +166,7 @@ void SOCPA::calculate_correlation_subkey(Array3D<RESULT_T>* corr) {
 		Bottinelli, Paul, and Joppe W. Bos. "Computational aspects of correlation power analysis." Journal of Cryptographic Engineering 7 (2017): 167-181.
 	*
 	* */
-	printf("Calculating correlation... on CPU\n");
+
 	// tiling parameter
 	const int tile_point = this->point_tile_size;
 	const int tile_trace = this->trace_tile_size;

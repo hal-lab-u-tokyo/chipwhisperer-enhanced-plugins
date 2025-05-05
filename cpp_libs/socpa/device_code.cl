@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:30:39
-*    Last Modified: 03-05-2025 14:00:58
+*    Last Modified: 06-05-2025 08:09:58
 */
 
 #ifndef OCL_SUM_HYPOTHESIS
@@ -165,12 +165,13 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE(
 )
 #undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE
 
+// ===================== FP32 emulatated implementation =====================
 
-#ifndef OCL_SUM_HYPOTHESIS_TRACE_FP32
-#define OCL_SUM_HYPOTHESIS_TRACE_FP32(...)
+#ifndef OCL_FP32_PREMITIVES
+#define OCL_FP32_PREMITIVES(...)
 #endif
 
-OCL_SUM_HYPOTHESIS_TRACE_FP32(
+OCL_FP32_PREMITIVES(
 	inline float2 quickTwoSum(float a, float b)
 	{
 		float s = a + b;
@@ -211,6 +212,14 @@ OCL_SUM_HYPOTHESIS_TRACE_FP32(
 		p = quickTwoSum(p.x, p.y);
 		return p;
 	}
+)
+
+#ifndef OCL_SUM_HYPOTHESIS_TRACE_FP32
+#define OCL_SUM_HYPOTHESIS_TRACE_FP32(...)
+#endif
+
+OCL_SUM_HYPOTHESIS_TRACE_FP32(
+
 	__kernel void sum_hypothesis_trace_kernel(
 		int byte_length, int num_guess, int num_traces, int num_points,
 		__global int* hypothetial_leakage,
@@ -237,3 +246,108 @@ OCL_SUM_HYPOTHESIS_TRACE_FP32(
 )
 #undef OCL_SUM_HYPOTHESIS_TRACE_FP32
 
+
+#ifndef OCL_SUM_TRACE_FP32
+#define OCL_SUM_TRACE_FP32(...)
+#endif
+
+OCL_SUM_TRACE_FP32(
+	__kernel void sum_trace_kernel(
+		int num_traces, int num_points, int window_size,
+		__global float2 *traces,
+		__global float2 *sum_trace_x_win, __global float2 *sum_trace2_x_win,
+		__global float2 *sum_trace_x_win2, __global float2 *sum_trace2_x_win2
+	) {
+		int point_index = get_global_id(0);
+		int window_index = get_global_id(1);
+
+		if (point_index < num_points && point_index + window_index + 1 < num_points && window_index < window_size) {
+			float2 partial_sum_trace_x_win = {0, 0};
+			float2 partial_sum_trace2_x_win = {0, 0};
+			float2 partial_sum_trace_x_win2 = {0, 0};
+			float2 partial_sum_trace2_x_win2 = {0, 0};
+			for (int trace_index = 0; trace_index < num_traces; trace_index++) {
+				float2 v1 = traces[trace_index * num_points + point_index];
+				float2 v2 = traces[trace_index * num_points + point_index + window_index + 1];
+				partial_sum_trace_x_win = df64_add(partial_sum_trace_x_win, df64_mul(v1, v2));
+				partial_sum_trace2_x_win = df64_add(partial_sum_trace2_x_win, df64_mul(df64_mul(v1, v1), v2));
+				partial_sum_trace_x_win2 = df64_add(partial_sum_trace_x_win2, df64_mul(v1, df64_mul(v2, v2)));
+				partial_sum_trace2_x_win2 = df64_add(partial_sum_trace2_x_win2, df64_mul(df64_mul(v1, v1), df64_mul(v2, v2)));
+			}
+			sum_trace_x_win[point_index * window_size + window_index] = partial_sum_trace_x_win;
+			sum_trace2_x_win[point_index * window_size + window_index] = partial_sum_trace2_x_win;
+			sum_trace_x_win2[point_index * window_size + window_index] = partial_sum_trace_x_win2;
+			sum_trace2_x_win2[point_index * window_size + window_index] = partial_sum_trace2_x_win2;
+		}
+	}
+)
+#undef OCL_SUM_TRACE_FP32
+
+
+#ifndef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32
+#define OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32(...)
+#endif
+
+OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32(
+
+	inline void atomic_add_double(__global float2 *addr, float2 val) {
+		ulong u_old;
+		float2 desired;
+
+		__global volatile ulong *uaddr = (__global volatile ulong *)addr;
+
+		do {
+			u_old = *uaddr; // unsafe load
+			desired = df64_add(as_float2(u_old), val);
+		} while (atom_cmpxchg(uaddr, u_old, as_ulong(desired)) != u_old);
+	}
+
+	__kernel void sum_hypothesis_combined_trace_kernel(
+		int num_traces, int start_point, int num_points, int window_size,
+		int hyp_offset,
+		__local float2* trace_cache,
+		__local float2* hyp_cache,
+		__global int* hypothetial_leakage,
+		__global float2* traces,
+		__global float2* sum_hypothesis_combined_trace
+	) {
+		const int point_per_block = get_local_size(2);
+		const int window_per_block = get_local_size(1);
+		const int trace_per_block = window_per_block; // assuming trace_per_block == window_per_block
+		const int CACHE_DIM_Y = point_per_block + 1;
+
+		const int point_offset = get_global_id(2);
+		const int point_index = point_offset + start_point;
+		const int trace_offset = get_group_id(0) * trace_per_block;
+		// const int end_trace = min(trace_per_block, num_traces - trace_offset);
+		const int end_window = min(window_size, num_points - point_index - 1);
+
+		if (point_index < num_points) {
+			int p_lid = get_local_id(2);
+			// copy trace data to shared memory
+			int trace_index = trace_offset + get_local_id(1);
+			if (trace_index < num_traces) {
+				trace_cache[get_local_id(1) * CACHE_DIM_Y + p_lid] = traces[trace_index * num_points + point_index];
+			}
+			if (p_lid == 0) {
+				float hyp_float = (trace_index < num_traces) ? (float)hypothetial_leakage[trace_index + hyp_offset] : 0;
+				hyp_cache[get_local_id(1)] = (float2)(hyp_float, 0);
+			}
+			// synchronize all threads in the work group
+			barrier(CLK_LOCAL_MEM_FENCE);
+
+			for (int w = get_local_id(1); w < end_window; w += window_per_block) {
+				float2 sum = {0, 0};
+				#pragma unroll
+				for (int t = 0; t < trace_per_block; t++) {
+					// sum += hyp_cache[t] * trace_cache[t * CACHE_DIM_Y + p_lid] * traces[(trace_offset + t) * num_points + point_index + w + 1];
+					float2 prod = df64_mul(hyp_cache[t], trace_cache[t * CACHE_DIM_Y + p_lid]);
+					prod = df64_mul(prod, traces[(trace_offset + t) * num_points + point_index + w + 1]);
+					sum = df64_add(sum, prod);
+				}
+				atomic_add_double(&sum_hypothesis_combined_trace[point_offset * window_size + w], sum);
+			}
+		}
+	}
+)
+#undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32

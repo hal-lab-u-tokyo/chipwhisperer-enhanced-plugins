@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  03-05-2025 05:56:44
-*    Last Modified: 03-05-2025 14:14:02
+*    Last Modified: 06-05-2025 08:13:43
 */
 
 #ifndef SOCPAOPENCL_H
@@ -52,11 +52,14 @@
 class SOCPAOpenCLBase : public SOCPA
 {
 public:
-	SOCPAOpenCLBase(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model);
+	SOCPAOpenCLBase(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model, bool need_double);
 	~SOCPAOpenCLBase();
 protected:
 	// OpenCL device memory
-	cl_mem cl_device_traces, cl_device_hypothetial_leakage, cl_device_sum_hypothesis,
+	// host -> device
+	cl_mem cl_device_traces, cl_device_hypothetial_leakage;
+	// device -> host
+	cl_mem cl_device_sum_hypothesis,
 			cl_device_sum_hypothesis_square, cl_device_sum_hypothesis_trace,
 			cl_device_sum_trace_x_win, cl_device_sum_trace2_x_win, cl_device_sum_trace_x_win2, cl_device_sum_trace2_x_win2;
 	cl_mem cl_device_sum_hypothesis_combined_trace;
@@ -81,17 +84,37 @@ protected:
 	size_t max_group_size;
 	size_t sqrt_max_group_size;
 
+	// intermediate array
+	double *sum_hypothesis_combined_trace;
+
 	virtual const char** get_sum_trace_kernel_code() { return &sum_trace_kernel_code; }
 	virtual const char** get_sum_hypothesis_kernel_code() { return &sum_hypothesis_kernel_code; }
 	virtual const char** get_sum_hypothesis_trace_kernel_code() { return &sum_hypothesis_trace_kernel_code; }
 	virtual const char** get_sum_hypothesis_combined_trace_kernel_code() { return &sum_hypothesis_coumbined_trace_kernel_code; }
 
-	virtual void calculate_hypothesis();
-	virtual void calculate_sum_trace();
-	virtual void calculate_sum_hypothesis_trace();
-	virtual void calculate_correlation_subkey(Array3D<RESULT_T>* corr);
+	virtual void allocate_device_memory();
+	virtual void create_programs();
+	virtual void build_kernel_programs();
+	virtual void create_kernels();
 
+	// kernel runner for derived class
+	virtual void run_sum_hypothesis_combined_trace_kernel(size_t *global_work_size, size_t *local_work_size)  = 0;
 	virtual void run_sum_hypothesis_kernel();
+	virtual void run_sum_hypothesis_trace_kernel() = 0;
+	virtual void run_sum_trace() = 0;
+
+
+	void calculate_hypothesis();
+	void calculate_sum_hypothesis_trace() {
+		run_sum_hypothesis_kernel();
+		run_sum_hypothesis_trace_kernel();
+	}
+	void calculate_correlation_subkey(Array3D<RESULT_T>* corr);
+	void calculate_sum_trace() {
+		run_sum_trace();
+	}
+
+
 
 private:
 	static cl_platform_id get_target_platform();
@@ -101,13 +124,29 @@ private:
 	static const char* sum_hypothesis_kernel_code;
 	static const char* sum_hypothesis_trace_kernel_code;
 	static const char* sum_hypothesis_coumbined_trace_kernel_code;
+
+	bool is_double_available(cl_device_id device_id);
 };
 
 
 class SOCPAOpenCL : public SOCPAOpenCLBase
 {
 public:
-	SOCPAOpenCL(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model);
+	SOCPAOpenCL(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model) : SOCPAOpenCLBase(byte_length, num_points, window_size, model, true) {
+		// create buffers
+		allocate_device_memory();
+
+		// create program
+		create_programs();
+
+		// build program
+		build_kernel_programs();
+
+		// create kernel
+		create_kernels();
+
+		clFinish(command_queue);
+	};
 
 protected:
 
@@ -116,10 +155,13 @@ protected:
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
 						py::array_t<uint8_t> &py_knownkey);
-	// 
+
+	virtual void run_sum_hypothesis_combined_trace_kernel(size_t *global_work_size, size_t *local_work_size);
+	virtual void run_sum_hypothesis_trace_kernel();
+	virtual void run_sum_trace();
 
 private:
-	bool is_double_available(cl_device_id device_id);
+	
 
 };
 #endif //SOCPAOPENCL_H

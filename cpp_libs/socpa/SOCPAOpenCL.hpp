@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  03-05-2025 05:56:44
-*    Last Modified: 07-05-2025 14:51:02
+*    Last Modified: 07-05-2025 15:17:47
 */
 
 #ifndef SOCPAOPENCL_H
@@ -134,7 +134,7 @@ private:
 	static const char* sum_hypothesis_coumbined_trace_kernel_code;
 	static const char* sum_hypothesis_coumbined_trace_kernel_code_nosm;
 
-	static bool check_compatibility(cl_device_id device_id, bool need_double);
+	bool check_compatibility(cl_device_id device_id, bool need_double);
 
 
 };

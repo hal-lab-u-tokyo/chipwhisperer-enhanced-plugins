@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  03-05-2025 05:56:52
-*    Last Modified: 07-05-2025 14:56:25
+*    Last Modified: 07-05-2025 15:16:58
 */
 
 
@@ -521,14 +521,15 @@ bool SOCPAOpenCLBase::check_compatibility(cl_device_id device_id, bool need_doub
 	}
 	if (need_double) {
 		// check if double precision is available on the device
-		auto pos = ext.find("cl_khr_fp64");
-		if (pos == string::npos) {
+		if (ext.find("cl_khr_fp64") == string::npos) {
 			return false;
 		}
 	}
-	// check int64 atomic support
-	if (ext.find("cl_khr_int64_base_atomics") == string::npos) {
-		return false;
+	if (use_shared_mem) {
+		// check int64 atomic support
+		if (ext.find("cl_khr_int64_base_atomics") == string::npos) {
+			return false;
+		}
 	}
 	return true;
 }

@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 09:07:18
-#   Last Modified: 06-05-2025 06:33:13
+#   Last Modified: 07-05-2025 14:53:15
 ###
 
 from chipwhisperer.common.utils.parameter import setupSetParam
@@ -106,23 +106,43 @@ class SOCPAAlogrithmCuda(SOCPAAlogrithm):
 
 class SOCPAAlogrithmOpenCL(SOCPAAlogrithm):
     """
-    Second Order CPA Attack with CUDA
+    Second Order CPA Attack with OpenCL
     """
 
     def getSoCpaKernel(self, byte_len, numpoints, model):
         from .cpa_algorithms.socpa_kernel import SOCPA
         from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCL
-        return SOCPAOpenCL(byte_len, numpoints, self._window_size, model)
+        return SOCPAOpenCL(byte_len, numpoints, self._window_size, model, True)
+
+class SOCPAAlogrithmOpenCLNoSM(SOCPAAlogrithm):
+    """
+    Second Order CPA Attack with OpenCL
+    """
+
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCL
+        return SOCPAOpenCL(byte_len, numpoints, self._window_size, model, False)
 
 class SOCPAAlogrithmOpenCLFP32(SOCPAAlogrithm):
     """
-    Second Order CPA Attack with CUDA
+    Second Order CPA Attack with OpenCL FP32
     """
 
     def getSoCpaKernel(self, byte_len, numpoints, model):
         from .cpa_algorithms.socpa_kernel import SOCPA
         from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCLFP32
-        return SOCPAOpenCLFP32(byte_len, numpoints, self._window_size, model)
+        return SOCPAOpenCLFP32(byte_len, numpoints, self._window_size, model, True)
+
+class SOCPAAlogrithmOpenCLFP32NoSM(SOCPAAlogrithm):
+    """
+    Second Order CPA Attack with OpenCL FP32 without shared memory
+    """
+
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCLFP32
+        return SOCPAOpenCLFP32(byte_len, numpoints, self._window_size, model, False)
 
 class SOCPA(AttackBaseClass):
     """Second Order CPA Attack"""

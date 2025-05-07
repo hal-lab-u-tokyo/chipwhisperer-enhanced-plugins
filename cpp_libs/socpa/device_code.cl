@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:30:39
-*    Last Modified: 06-05-2025 08:09:58
+*    Last Modified: 07-05-2025 14:30:10
 */
 
 #ifndef OCL_SUM_HYPOTHESIS
@@ -122,11 +122,11 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE(
 	__kernel void sum_hypothesis_combined_trace_kernel(
 		int num_traces, int start_point, int num_points, int window_size,
 		int hyp_offset,
-		__local double* trace_cache,
-		__local double* hyp_cache,
 		__global int* hypothetial_leakage,
 		__global double* traces,
-		__global double* sum_hypothesis_combined_trace
+		__global double* sum_hypothesis_combined_trace,
+		__local double* trace_cache,
+		__local double* hyp_cache
 	) {
 		const int point_per_block = get_local_size(2);
 		const int window_per_block = get_local_size(1);
@@ -154,7 +154,6 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE(
 
 			for (int w = get_local_id(1); w < end_window; w += window_per_block) {
 				double sum = 0;
-				#pragma unroll
 				for (int t = 0; t < trace_per_block; t++) {
 					sum += hyp_cache[t] * trace_cache[t * CACHE_DIM_Y + p_lid] * traces[(trace_offset + t) * num_points + point_index + w + 1];
 				}
@@ -164,6 +163,41 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE(
 	}
 )
 #undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE
+
+#ifndef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_NOSM
+#define OCL_SUM_HYPOTHESIS_COMBINED_TRACE_NOSM(...)
+#endif
+
+OCL_SUM_HYPOTHESIS_COMBINED_TRACE_NOSM(
+
+
+	__kernel void sum_hypothesis_combined_trace_kernel(
+		int num_traces, int start_point, int num_points, int window_size,
+		int hyp_offset,
+		__global int* hypothetial_leakage,
+		__global double* traces,
+		__global double* sum_hypothesis_combined_trace
+	) {
+		int point_index = get_global_id(0) + start_point;
+		int window_index = get_global_id(1);
+
+		double sum = 0;
+		if (point_index < num_points && point_index + window_index + 1 < num_points && window_index < window_size) {
+			for (int trace_index = 0; trace_index < num_traces; trace_index++) {
+				int hyp = hypothetial_leakage[trace_index + hyp_offset];
+				double v1 = traces[trace_index * num_points + point_index];
+				double v2 = traces[trace_index * num_points + point_index + window_index + 1];
+				sum += (double)hyp * v1 * v2;
+			}
+			// sum_hypothesis_combined_trace[point_index * window_size + window_index] += sum;
+			int index = get_global_id(0) * window_size + window_index;
+			sum_hypothesis_combined_trace[index] = sum;
+		}
+	}
+)
+
+#undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_NOSM
+
 
 // ===================== FP32 emulatated implementation =====================
 
@@ -305,11 +339,11 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32(
 	__kernel void sum_hypothesis_combined_trace_kernel(
 		int num_traces, int start_point, int num_points, int window_size,
 		int hyp_offset,
-		__local float2* trace_cache,
-		__local float2* hyp_cache,
 		__global int* hypothetial_leakage,
 		__global float2* traces,
-		__global float2* sum_hypothesis_combined_trace
+		__global float2* sum_hypothesis_combined_trace,
+		__local float2* trace_cache,
+		__local float2* hyp_cache
 	) {
 		const int point_per_block = get_local_size(2);
 		const int window_per_block = get_local_size(1);
@@ -338,7 +372,6 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32(
 
 			for (int w = get_local_id(1); w < end_window; w += window_per_block) {
 				float2 sum = {0, 0};
-				#pragma unroll
 				for (int t = 0; t < trace_per_block; t++) {
 					// sum += hyp_cache[t] * trace_cache[t * CACHE_DIM_Y + p_lid] * traces[(trace_offset + t) * num_points + point_index + w + 1];
 					float2 prod = df64_mul(hyp_cache[t], trace_cache[t * CACHE_DIM_Y + p_lid]);
@@ -351,3 +384,40 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32(
 	}
 )
 #undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32
+
+
+#ifndef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32_NOSM
+#define OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32_NOSM(...)
+#endif
+
+OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32_NOSM(
+
+
+	__kernel void sum_hypothesis_combined_trace_kernel(
+		int num_traces, int start_point, int num_points, int window_size,
+		int hyp_offset,
+		__global int* hypothetial_leakage,
+		__global float2* traces,
+		__global float2* sum_hypothesis_combined_trace
+	) {
+		int point_index = get_global_id(0) + start_point;
+		int window_index = get_global_id(1);
+
+		float2 sum = {0, 0};
+		if (point_index < num_points && point_index + window_index + 1 < num_points && window_index < window_size) {
+			for (int trace_index = 0; trace_index < num_traces; trace_index++) {
+				int hyp = hypothetial_leakage[trace_index + hyp_offset];
+				float2 v1 = traces[trace_index * num_points + point_index];
+				float2 v2 = traces[trace_index * num_points + point_index + window_index + 1];
+				float2 prod = df64_mul((float2)((float)hyp, 0), v1);
+				prod = df64_mul(prod, v2);
+				sum = df64_add(sum, prod);
+			}
+			// sum_hypothesis_combined_trace[point_index * window_size + window_index] += sum;
+			int index = get_global_id(0) * window_size + window_index;
+			sum_hypothesis_combined_trace[index] = sum;
+		}
+	}
+)
+
+#undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32_NOSM

@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2025 06:33:19
-*    Last Modified: 06-05-2025 08:11:52
+*    Last Modified: 07-05-2025 01:05:43
 */
 
 
@@ -21,8 +21,6 @@
 #endif
 
 #include <iostream>
-#include <chrono>
-#include <sys/sysinfo.h>
 #include <algorithm>
 
 namespace py = pybind11;
@@ -171,6 +169,9 @@ void SOCPA::calculate_correlation_subkey(Array3D<RESULT_T>* corr) {
 	const int tile_point = this->point_tile_size;
 	const int tile_trace = this->trace_tile_size;
 
+	QUADFLOAT div_n = (QUADFLOAT)(1.0/(double)num_traces);
+	QUADFLOAT div_nn = SQUARE(div_n);
+
 	#ifdef _OPENMP
 	#pragma omp parallel for collapse(2)
 	#endif
@@ -229,12 +230,12 @@ void SOCPA::calculate_correlation_subkey(Array3D<RESULT_T>* corr) {
 						auto s12 = (QUADFLOAT)sum_trace2_x_win->at(p, w);
 						auto s13 = (QUADFLOAT)sum_trace_x_win2->at(p, w);
 
-						QUADFLOAT n_lambda3 = (QUADFLOAT)num_traces * s11 
-									- 2.0 * (s2 * s12 + s1 * s13)  +
-									(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (QUADFLOAT)num_traces -
-									3.0 * SQUARE(s1 * s2) / (QUADFLOAT)SQUARE(num_traces);
-						QUADFLOAT lambda2 = s4 - (s1 * s2)/(QUADFLOAT)num_traces;
-						QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3)/ (QUADFLOAT)num_traces;
+						QUADFLOAT n_lambda3 = (QUADFLOAT)num_traces * s11 -
+									QUADFLOAT(2.0) * (s2 * s12 + s1 * s13)  +
+									(SQUARE(s2) * s6 + QUADFLOAT(4.0) * s1 * s2 * s4 + SQUARE(s1) * s8) * div_n -
+									QUADFLOAT(3.0) * SQUARE(s1 * s2) * div_nn;
+						QUADFLOAT lambda2 = s4 - (s1 * s2) * div_n;
+						QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3) * div_n;
 						RESULT_T corr = (RESULT_T)(n_lambda1 - lambda2 * s3) /
 										std::sqrt((RESULT_T)(((n_lambda3 - SQUARE(lambda2)) * (num_traces * s9 - SQUARE(s3)))));
 

@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  03-05-2025 05:56:52
-*    Last Modified: 06-05-2025 08:11:45
+*    Last Modified: 07-05-2025 14:56:25
 */
 
 
@@ -40,12 +40,18 @@ const char* SOCPAOpenCLBase::sum_hypothesis_coumbined_trace_kernel_code =
 ;
 #undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE
 
+#define OCL_SUM_HYPOTHESIS_COMBINED_TRACE_NOSM(...) #__VA_ARGS__
+const char* SOCPAOpenCLBase::sum_hypothesis_coumbined_trace_kernel_code_nosm =
+#include "device_code.cl"
+;
+#undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_NOSM
 
 // =============================== Base class ===============================
 
 SOCPAOpenCLBase::SOCPAOpenCLBase(int byte_length, int num_points, int window_size,
-	AESLeakageModel::ModelBase *model, bool need_double) :
+	AESLeakageModel::ModelBase *model, bool need_double, bool use_shared_mem) :
 	SOCPA(byte_length, num_points, window_size, model),
+	use_shared_mem(use_shared_mem),
 	cl_device_traces(nullptr), cl_device_hypothetial_leakage(nullptr),
 	cl_device_sum_hypothesis_trace(nullptr),
 	sum_trace_kernel(nullptr), sum_hypothesis_combined_trace_kernel(nullptr),
@@ -60,13 +66,16 @@ SOCPAOpenCLBase::SOCPAOpenCLBase(int byte_length, int num_points, int window_siz
 	// get device
 	device_id = get_target_device(platform_id);
 
-	// check if double precision is available on the device
-	if (need_double) {
-		if(!is_double_available(device_id)) {
-			throw runtime_error("Error: Double precision is not supported\n"
-								"Try to use SOCPAOpenCLFP32 instead");
+	// check compatibility
+	if (!check_compatibility(device_id, need_double)) {
+		auto msg = std::string("Device compatibility check failed: ") + 
+			"Device must support atomic operations on int64";
+		if (need_double) {
+			msg += " and double precision floating point";
 		}
+		throw runtime_error(msg + "\n");
 	}
+
 
 	// create context
 	context = clCreateContext(nullptr, 1, &device_id, nullptr, nullptr, &err);
@@ -196,6 +205,14 @@ void SOCPAOpenCLBase::build_kernel_programs()
 
 	err = clBuildProgram(sum_hypothesis_combined_trace_kernel_program, 1, &device_id, nullptr, nullptr, nullptr);
 	if (err != CL_SUCCESS) {
+		// get log
+		size_t log_size;
+		clGetProgramBuildInfo(sum_hypothesis_combined_trace_kernel_program,
+							device_id, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+		vector<char> log(log_size);
+		clGetProgramBuildInfo(sum_hypothesis_combined_trace_kernel_program,
+							device_id, CL_PROGRAM_BUILD_LOG, log_size, log.data(), nullptr);
+		fprintf(stderr, "%s\n", log.data());
 		throw runtime_error("Error: Failed to build program \"sum_hypothesis_combined_trace_kernel\" ("
 							+ to_string(err) + ")");
 	}
@@ -351,40 +368,75 @@ void SOCPAOpenCLBase::calculate_hypothesis()
 
 void SOCPAOpenCLBase::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 {
+	QUADFLOAT div_n = (QUADFLOAT)(1.0/(double)num_traces);
+	QUADFLOAT div_nn = SQUARE(div_n);
+
+	size_t local_work_size[3];
+	size_t global_work_size[3];
+
 	size_t trace_per_block = 16;
 	size_t point_per_block = 32;
 	size_t window_per_block = 16;
 
-	// check if group size does not exceed the max group size
-	while (window_per_block * point_per_block > max_group_size) {
-		point_per_block /= 2;
+	if (use_shared_mem) {
+
+		// check if group size does not exceed the max group size
+		while (window_per_block * point_per_block > max_group_size) {
+			point_per_block /= 2;
+		}
+
+		// check if local memory size is enough
+		size_t required_local_mem_size = (sizeof(double) * trace_per_block * (point_per_block + 1)) + (sizeof(int) * trace_per_block);
+
+		// threads size
+		local_work_size[0] = 1;
+		local_work_size[1] = window_per_block;
+		local_work_size[2] = point_per_block;
+		size_t ceiled_num_points = ((point_tile_size + point_per_block - 1) / point_per_block) * point_per_block;
+		// global_work_size = {(size_t)(num_traces + trace_per_block - 1) / trace_per_block,
+									// window_per_block, (size_t)ceiled_num_points};
+		global_work_size[0] = (size_t)(num_traces + trace_per_block - 1) / trace_per_block;
+		global_work_size[1] = window_per_block;
+		global_work_size[2] = ceiled_num_points;
+
+		if (required_local_mem_size > local_mem_size) {
+			throw runtime_error("Error: Local memory size is not enough");
+		}
+	} else {
+		size_t local_point_size = 32;
+		size_t local_window_size = 16;
+
+		// check if group size does not exceed the max group size
+		while (local_point_size * local_window_size > max_group_size) {
+			local_point_size /= 2;
+		}
+
+		// threads size
+		// local_work_size = {local_point_size, local_window_size};
+		local_work_size[0] = local_point_size;
+		local_work_size[1] = local_window_size;
+		size_t ceiled_num_points = ((point_tile_size + local_point_size - 1) / local_point_size) * local_point_size;
+		size_t ceiled_window_size = ((window_size + local_window_size - 1) / local_window_size) * local_window_size;
+		// global_work_size = {ceiled_num_points, ceiled_window_size};
+		global_work_size[0] = ceiled_num_points;
+		global_work_size[1] = ceiled_window_size;
 	}
-
-
-	// threads size
-	size_t local_work_size[3] = {1, window_per_block, point_per_block};
-	size_t ceiled_num_points = ((point_tile_size + point_per_block - 1) / point_per_block) * point_per_block;
-	size_t global_work_size[3] = {(size_t)(num_traces + trace_per_block - 1) / trace_per_block,
-								 window_per_block, (size_t)ceiled_num_points};
 
 	// set common kernel arguments
 	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 0, sizeof(int), &num_traces);
 	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 2, sizeof(int), &num_points);
 	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 3, sizeof(int), &window_size);
-	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 5, sizeof(double) * trace_per_block * (point_per_block + 1), NULL);
-	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 6, sizeof(double) * trace_per_block, NULL);
-	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 7, sizeof(cl_mem),
+	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 5, sizeof(cl_mem),
 	&cl_device_hypothetial_leakage);
-	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 8, sizeof(cl_mem),
+	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 6, sizeof(cl_mem),
 	&cl_device_traces);
-	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 9, sizeof(cl_mem),
+	clSetKernelArg(sum_hypothesis_combined_trace_kernel, 7, sizeof(cl_mem),
 	&cl_device_sum_hypothesis_combined_trace);
-
-	// check if local memory size is enough
-	size_t required_local_mem_size = (sizeof(double) * trace_per_block * (point_per_block + 1)) + (sizeof(int) * trace_per_block);
-	if (required_local_mem_size > local_mem_size) {
-		throw runtime_error("Error: Local memory size is not enough");
+	if (use_shared_mem) {
+		clSetKernelArg(sum_hypothesis_combined_trace_kernel, 8, sizeof(double) * trace_per_block * (point_per_block + 1), NULL);
+		clSetKernelArg(sum_hypothesis_combined_trace_kernel, 9, sizeof(double) * trace_per_block, NULL);
 	}
+
 
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
@@ -424,14 +476,17 @@ void SOCPAOpenCLBase::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 							auto s11 = (QUADFLOAT)sum_trace2_x_win2->at(p, w);
 							auto s7 = sum_hypothesis_trace->at(byte_index, guess, p + w + 1);
 							auto s10 = sum_hypothesis_combined_trace[pp * window_size + w];
-							QUADFLOAT n_lambda3 = (QUADFLOAT)num_traces * s11 
-									- 2.0 * (s2 * s12 + s1 * s13)  +
-									(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (QUADFLOAT)num_traces -
-									3.0 * SQUARE(s1 * s2) / (QUADFLOAT)SQUARE(num_traces);
-							QUADFLOAT lambda2 = s4 - (s1 * s2)/(QUADFLOAT)num_traces;
-							QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3)/ (QUADFLOAT)num_traces;
+
+							QUADFLOAT n_lambda3 = (QUADFLOAT)num_traces * s11 -
+									QUADFLOAT(2.0) * (s2 * s12 + s1 * s13)  +
+									(SQUARE(s2) * s6 + QUADFLOAT(4.0) * s1 * s2 * s4 + SQUARE(s1) * s8) * div_n -
+									QUADFLOAT(3.0) * SQUARE(s1 * s2) * div_nn;
+							QUADFLOAT lambda2 = s4 - (s1 * s2) * div_n;
+							QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3) * div_n;
 							RESULT_T corr = (RESULT_T)(n_lambda1 - lambda2 * s3) /
 											std::sqrt((RESULT_T)(((n_lambda3 - SQUARE(lambda2)) * (num_traces * s9 - SQUARE(s3)))));
+
+							// check if the correlation is larger than the max correlation
 							if (std::abs(corr) > std::abs(max_corr)) {
 								max_corr = corr;
 								max_win = w;
@@ -449,7 +504,7 @@ void SOCPAOpenCLBase::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 
 }
 
-bool SOCPAOpenCLBase::is_double_available(cl_device_id device_id)
+bool SOCPAOpenCLBase::check_compatibility(cl_device_id device_id, bool need_double)
 {
 	cl_int err;
 	size_t ext_size;
@@ -464,9 +519,20 @@ bool SOCPAOpenCLBase::is_double_available(cl_device_id device_id)
 		throw runtime_error("Error: Failed to get device info ("
 							+ to_string(err) + ")");
 	}
-	size_t pos = ext.find("cl_khr_fp64");
-	return (pos != string::npos);
+	if (need_double) {
+		// check if double precision is available on the device
+		auto pos = ext.find("cl_khr_fp64");
+		if (pos == string::npos) {
+			return false;
+		}
+	}
+	// check int64 atomic support
+	if (ext.find("cl_khr_int64_base_atomics") == string::npos) {
+		return false;
+	}
+	return true;
 }
+
 
 void SOCPAOpenCLBase::run_sum_hypothesis_kernel()
 {
@@ -501,6 +567,7 @@ void SOCPAOpenCLBase::run_sum_hypothesis_kernel()
 		sum_hypothesis_square->get_size());
 	clFinish(command_queue);
 }
+
 
 // =============================== Derived class ===============================
 
@@ -663,14 +730,18 @@ void SOCPAOpenCL::run_sum_hypothesis_combined_trace_kernel(size_t *global_work_s
 {
 	cl_int err;
 
+	unsigned int thread_dim = (use_shared_mem) ? 3 : 2;
+
 	// clear sum_hypothesis_combined_trace on the GPU
-	double zero = 0.0;
-	err = clEnqueueFillBuffer(command_queue, cl_device_sum_hypothesis_combined_trace,
-					&zero, sizeof(double), 0,
-					sizeof(double) * point_tile_size * window_size, 0, nullptr, nullptr);
+	if (use_shared_mem) {
+		double zero = 0.0;
+		err = clEnqueueFillBuffer(command_queue, cl_device_sum_hypothesis_combined_trace,
+						&zero, sizeof(double), 0,
+						sizeof(double) * point_tile_size * window_size, 0, nullptr, nullptr);
+	}
 
 	err = clEnqueueNDRangeKernel(command_queue, sum_hypothesis_combined_trace_kernel,
-					3, nullptr, global_work_size, local_work_size,
+					thread_dim, nullptr, global_work_size, local_work_size,
 					0, nullptr, nullptr);
 	if (err != CL_SUCCESS) {
 		throw runtime_error("Error: Failed to execute kernel \"sum_hypothesis_combined_trace_kernel\" ("
@@ -688,8 +759,8 @@ void SOCPAOpenCL::run_sum_hypothesis_combined_trace_kernel(size_t *global_work_s
 PYBIND11_MODULE(socpa_opencl_kernel, module) {
 	module.doc() = "OpenCL implemetation plugin for SOCPA";
 	py::class_<SOCPAOpenCL,SOCPA>(module, "SOCPAOpenCL")
-		.def(py::init<int, int, int, AESLeakageModel::ModelBase*>());
+		.def(py::init<int, int, int, AESLeakageModel::ModelBase*, bool>());
 	py::class_<SOCPAOpenCLFP32,SOCPA>(module, "SOCPAOpenCLFP32")
-		.def(py::init<int, int, int, AESLeakageModel::ModelBase*>());
+		.def(py::init<int, int, int, AESLeakageModel::ModelBase*, bool>());
 
 }

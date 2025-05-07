@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  04-05-2025 06:37:15
-*    Last Modified: 06-05-2025 08:11:14
+*    Last Modified: 07-05-2025 15:00:09
 */
 
 #include "SOCPAOpenCLFP32.hpp"
@@ -35,17 +35,36 @@ const char* SOCPAOpenCLFP32::sum_hypothesis_coumbined_trace_kernel_code =
 ;
 #undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32
 
+#define OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32_NOSM(...) #__VA_ARGS__
+const char* SOCPAOpenCLFP32::sum_hypothesis_coumbined_trace_kernel_code_nosm =
+#include "device_code.cl"
+;
+#undef OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32_NOSM
+
 #undef OCL_FP32_PREMITIVES
 
-// =============================== Derived class ===============================
+// =============================== Base class ===============================
 
-SOCPAOpenCLFP32::SOCPAOpenCLFP32(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model) : 
-	SOCPAOpenCLBase(byte_length, num_points, window_size, model, false),
+inline cl_float2 to_float2(double x)
+{
+	const double SPLITTER = (1 << 29) + 1;
+	double t = SPLITTER * x;
+	double t_hi = t - (t - x);
+	double t_lo = x - t_hi;
+	return cl_float2({(float)t_hi, (float)t_lo});
+}
+
+inline double to_double(cl_float2 x)
+{
+	return (double)x.x + (double)x.y;
+}
+
+SOCPAOpenCLFP32::SOCPAOpenCLFP32(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model, bool use_shared_mem) :
+	SOCPAOpenCLBase(byte_length, num_points, window_size, model, false, use_shared_mem),
 	traces_df64(nullptr), sum_hypothesis_trace_df64(nullptr),
 	sum_trace_x_win_df64(nullptr), sum_trace2_x_win_df64(nullptr),
 	sum_trace_x_win2_df64(nullptr), sum_trace2_x_win2_df64(nullptr)
 {
-
 	// create buffers
 	allocate_device_memory();
 
@@ -267,14 +286,18 @@ void SOCPAOpenCLFP32::run_sum_hypothesis_combined_trace_kernel(size_t *global_wo
 {
 	cl_int err;
 
-	// clear sum_hypothesis_combined_trace on the GPU
-	cl_float2 zero = {0.0f, 0.0f};
-	err = clEnqueueFillBuffer(command_queue, cl_device_sum_hypothesis_combined_trace,
-						&zero, sizeof(cl_float2), 0,
-						sizeof(double) * point_tile_size * window_size, 0, nullptr, nullptr);
+	unsigned int thread_dim = 2;
+	if (use_shared_mem) {
+		// clear sum_hypothesis_combined_trace on the GPU
+		cl_float2 zero = {0.0f, 0.0f};
+		err = clEnqueueFillBuffer(command_queue, cl_device_sum_hypothesis_combined_trace,
+							&zero, sizeof(cl_float2), 0,
+							sizeof(cl_float2) * point_tile_size * window_size, 0, nullptr, nullptr);
+		thread_dim = 3;
+	}
 
 	err = clEnqueueNDRangeKernel(command_queue, sum_hypothesis_combined_trace_kernel,
-								3, nullptr, global_work_size, local_work_size,
+								thread_dim, nullptr, global_work_size, local_work_size,
 								0, nullptr, nullptr);
 	if (err != CL_SUCCESS) {
 		throw runtime_error("Error: Failed to execute kernel \"sum_hypothesis_combined_trace_kernel\" ("

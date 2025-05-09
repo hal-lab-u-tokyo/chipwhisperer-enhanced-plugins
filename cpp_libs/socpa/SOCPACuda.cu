@@ -1,17 +1,19 @@
 /*
 *    Copyright (C) 2025 The University of Tokyo
 *    
-*    File:          /cpp_libs/socpa/SOCPACuda.cpp
+*    File:          /cpp_libs/socpa/SOCPACuda.cu
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  01-02-2025 09:16:59
-*    Last Modified: 01-02-2025 09:17:38
+*    Last Modified: 09-05-2025 18:43:18
 */
+
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
 #include "SOCPACuda.hpp"
+#include "SOCPACudaFP32.hpp"
 
 namespace py = pybind11;
 
@@ -19,14 +21,16 @@ namespace py = pybind11;
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-#include <chrono>
 #include <cuda.h>
 #include <cuda_profiler_api.h>
 #include <cmath>
 #include <algorithm>
 
-SOCPACuda::SOCPACuda(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model) :
-	SOCPA(byte_length, num_points, window_size, model)
+
+SOCPACuda::SOCPACuda(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model,
+	bool use_shared_mem) :
+	SOCPA(byte_length, num_points, window_size, model),
+	use_shared_mem(use_shared_mem)
 {
 		// get device properties
 		cudaDeviceProp prop;
@@ -65,6 +69,7 @@ SOCPACuda::SOCPACuda(int byte_length, int num_points, int window_size, AESLeakag
 		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_combined_trace,
 						sizeof(double) * point_tile_size * window_size));
 
+		sum_hypothesis_combined_trace = new double[point_tile_size * window_size];
 
 		// init as nullptr
 		// allocated at the first call of setup_arrays becasue the size is not known at this point
@@ -93,6 +98,29 @@ void sum_hypothesis_kernel(int byte_length, int num_guess, int num_traces,
 	}
 }
 
+void SOCPACuda::calculate_sum_hypothesis()
+{
+	// updata sum_hypothesis, sum_hypothesis_square
+	dim3 dimBlock(32);
+	dim3 dimGrid(byte_length, (NUM_GUESSES + dimBlock.x - 1) / dimBlock.x);
+	sum_hypothesis_kernel<<<dimGrid, dimBlock>>>(byte_length, NUM_GUESSES, num_traces,
+		device_hypothetial_leakage, device_sum_hypothesis, device_sum_hypothesis_square);
+	auto err = cudaGetLastError();
+	if (err != cudaSuccess) {
+		throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
+	}
+	// copy back
+	CUDA_CHECK(cudaMemcpy((int64_t*)sum_hypothesis->get_pointer(),
+				device_sum_hypothesis,
+				sum_hypothesis->get_size(),
+				cudaMemcpyDeviceToHost));
+	CUDA_CHECK(cudaMemcpy((int64_t*)sum_hypothesis_square->get_pointer(),
+				device_sum_hypothesis_square,
+				sum_hypothesis_square->get_size(),
+				cudaMemcpyDeviceToHost));
+
+}
+
 __global__
 void sum_hypothesis_trace_kernel(int byte_length, int num_guess,
 	int num_traces, int num_points, int *hypothetial_leakage, double *traces,
@@ -114,35 +142,20 @@ void sum_hypothesis_trace_kernel(int byte_length, int num_guess,
 }
 
 void SOCPACuda::calculate_sum_hypothesis_trace() {
-	// updata sum_hypothesis, sum_hypothesis_square
-	dim3 dimBlock(32);
-	dim3 dimGrid(byte_length, (NUM_GUESSES + dimBlock.x - 1) / dimBlock.x);
-	sum_hypothesis_kernel<<<dimGrid, dimBlock>>>(byte_length, NUM_GUESSES, num_traces,
-		device_hypothetial_leakage, device_sum_hypothesis, device_sum_hypothesis_square);
-	auto err = cudaGetLastError();
-	if (err != cudaSuccess) {
-		throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
-	}
+	calculate_sum_hypothesis();
+
 	// offload to GPU for sum_hypothesis_trace
-	dimBlock = dim3(32, 32);
-	dimGrid = dim3(byte_length, (NUM_GUESSES + dimBlock.x - 1) / dimBlock.x, (num_points + dimBlock.y - 1) / dimBlock.y);
+	dim3 dimBlock = dim3(32, 32);
+	dim3 dimGrid = dim3(byte_length, (NUM_GUESSES + dimBlock.x - 1) / dimBlock.x, (num_points + dimBlock.y - 1) / dimBlock.y);
 
 	sum_hypothesis_trace_kernel<<<dimGrid, dimBlock>>>(byte_length, NUM_GUESSES, num_traces, num_points,
 		device_hypothetial_leakage, device_traces, device_sum_hypothesis_trace);
-	err = cudaGetLastError();
+	auto err = cudaGetLastError();
 	if (err != cudaSuccess) {
 		throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
 	}
 
 	// copy back
-	CUDA_CHECK(cudaMemcpy((int64_t*)sum_hypothesis->get_pointer(),
-							device_sum_hypothesis,
-							sum_hypothesis->get_size(),
-							cudaMemcpyDeviceToHost));
-	CUDA_CHECK(cudaMemcpy((int64_t*)sum_hypothesis_square->get_pointer(),
-							device_sum_hypothesis_square,
-							sum_hypothesis_square->get_size(),
-							cudaMemcpyDeviceToHost));
 	CUDA_CHECK(cudaMemcpy((double*)sum_hypothesis_trace->get_pointer(),
 							device_sum_hypothesis_trace,
 							sum_hypothesis_trace->get_size(),
@@ -264,46 +277,103 @@ void sum_hypothesis_coumbined_trace_kernel(
 	}
 }
 
-#include <chrono>
-void SOCPACuda::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
+__global__
+void sum_hypothesis_coumbined_trace_kernel_nosm(
+	int num_traces, int start_point, int num_points, int window_size,
+	int *hypothetial_leakage, double *traces,
+	double *sum_hypothesis_combined_trace)
 {
+	int point_offset = blockIdx.x * blockDim.x + threadIdx.x;
+	int point_index = point_offset + start_point;
+	int window_index = blockIdx.y * blockDim.y + threadIdx.y;
 
+	double sum = 0;
+	if (point_index < num_points && window_index < window_size && point_index + window_index + 1 < num_points) {
+		for (int trace_index = 0; trace_index < num_traces; trace_index++) {
+			int hyp = hypothetial_leakage[trace_index];
+			sum += hyp * traces[trace_index * num_points + point_index] * traces[trace_index * num_points + point_index + window_index + 1];
+		}
+		sum_hypothesis_combined_trace[point_offset * window_size + window_index] = sum;
+	}
+}
+
+
+void SOCPACuda::run_sum_hypothesis_coumbined_trace_kernel(int start_point, int hyp_offset)
+{
 	// x: traces, y: window, z: points
 	dim3 dimBlock(1, window_per_block, point_per_block);
 	dim3 dimGrid((num_traces + trace_per_block - 1) / trace_per_block,
 				1,
 				(point_tile_size + dimBlock.z - 1) / dimBlock.z);
 
-	auto sum_hypothesis_combined_trace = new double[point_tile_size * window_size];
+	// clear sum_hypothesis_combined_trace on the GPU
+	CUDA_CHECK(cudaMemset(device_sum_hypothesis_combined_trace, 0,
+		sizeof(double) * point_tile_size * window_size));
+
+	sum_hypothesis_coumbined_trace_kernel<<<dimGrid, dimBlock>>>(num_traces,
+		start_point, num_points, window_size,
+		&device_hypothetial_leakage[hyp_offset], device_traces,
+		device_sum_hypothesis_combined_trace);
+
+	auto err = cudaGetLastError();
+	if (err != cudaSuccess) {
+		throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
+	}
+
+	// copy back
+	CUDA_CHECK(cudaMemcpy(sum_hypothesis_combined_trace,
+							device_sum_hypothesis_combined_trace,
+							sizeof(double) * point_tile_size * window_size,
+							cudaMemcpyDeviceToHost));
+
+}
+
+
+void SOCPACuda::run_sum_hypothesis_coumbined_trace_kernel_nosm(int start_point, int hyp_offset)
+{
+	// x: traces, y: window, z: points
+	dim3 dimBlock(32, 16);
+	dim3 dimGrid((point_tile_size + dimBlock.x - 1) / dimBlock.x,
+				(window_size + dimBlock.y - 1) / dimBlock.y);
+
+	sum_hypothesis_coumbined_trace_kernel_nosm<<<dimGrid, dimBlock>>>(num_traces,
+		start_point, num_points, window_size,
+		&device_hypothetial_leakage[hyp_offset], device_traces,
+		device_sum_hypothesis_combined_trace);
+
+	auto err = cudaGetLastError();
+	if (err != cudaSuccess) {
+		throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
+	}
+
+	// copy back
+	CUDA_CHECK(cudaMemcpy(sum_hypothesis_combined_trace,
+							device_sum_hypothesis_combined_trace,
+							sizeof(double) * point_tile_size * window_size,
+							cudaMemcpyDeviceToHost));
+
+}
+
+void SOCPACuda::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
+{
+
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
 
 			auto s3 = sum_hypothesis->at(byte_index, guess);
 			auto s9 = sum_hypothesis_square->at(byte_index, guess);
 
+			int hyp_offset = byte_index * NUM_GUESSES * num_traces + guess * num_traces;
+
 			for (int tp = 0; tp < num_points; tp += point_tile_size) {
 
-				int start_point = tp;
-
-				// clear sum_hypothesis_combined_trace on the GPU
-				CUDA_CHECK(cudaMemset(device_sum_hypothesis_combined_trace, 0,
-						sizeof(double) * point_tile_size * window_size));
-
-				sum_hypothesis_coumbined_trace_kernel<<<dimGrid, dimBlock>>>(num_traces,
-					start_point, num_points, window_size,
-					&device_hypothetial_leakage[byte_index * NUM_GUESSES * num_traces + guess * num_traces], device_traces,
-					device_sum_hypothesis_combined_trace);
-
-				auto err = cudaGetLastError();
-				if (err != cudaSuccess) {
-					throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
+				if (use_shared_mem) {
+					// run sum_hypothesis_coumbined_trace_kernel
+					run_sum_hypothesis_coumbined_trace_kernel(tp, hyp_offset);
+				} else {
+					// run sum_hypothesis_coumbined_trace_kernel_nosm
+					run_sum_hypothesis_coumbined_trace_kernel_nosm(tp, hyp_offset);
 				}
-				// copy back
-				CUDA_CHECK(cudaMemcpy(sum_hypothesis_combined_trace,
-										device_sum_hypothesis_combined_trace,
-										sizeof(double) * point_tile_size * window_size,
-										cudaMemcpyDeviceToHost));
-
 
 				// calculate correlation
 				#ifdef _OPENMP
@@ -335,6 +405,7 @@ void SOCPACuda::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 							QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3)/ (QUADFLOAT)num_traces;
 							RESULT_T corr = (RESULT_T)(n_lambda1 - lambda2 * s3) /
 											std::sqrt((RESULT_T)(((n_lambda3 - SQUARE(lambda2)) * (num_traces * s9 - SQUARE(s3)))));
+
 							if (std::abs(corr) > std::abs(max_corr)) {
 								max_corr = corr;
 								max_win = w;
@@ -368,7 +439,6 @@ void SOCPACuda::setup_arrays(py::array_t<TRACE_T> &py_traces,
 						sum_hypothesis_trace->get_size()));
 	}
 
-
 	if (device_traces == nullptr) {
 		CUDA_CHECK(cudaMalloc((void**)&device_traces,
 			traces->get_size()));
@@ -387,6 +457,7 @@ void SOCPACuda::setup_arrays(py::array_t<TRACE_T> &py_traces,
 
 void SOCPACuda::calculate_hypothesis()
 {
+
 	SOCPA::calculate_hypothesis();
 	// copy CPU calculated hypothetial_leakage to GPU
 	CUDA_CHECK(cudaMemcpy(device_hypothetial_leakage,
@@ -406,13 +477,17 @@ SOCPACuda::~SOCPACuda() {
 	cudaFree(device_sum_trace2_x_win);
 	cudaFree(device_sum_trace_x_win2);
 	cudaFree(device_sum_trace2_x_win2);
+	delete[] sum_hypothesis_combined_trace;
 };
 
 PYBIND11_MODULE(socpa_cuda_kernel, module) {
 	module.doc() = "CUDA implemetation plugin for SOCPA";
 
 	py::class_<SOCPACuda,SOCPA>(module, "SOCPACuda")
-		.def(py::init<int, int, int, AESLeakageModel::ModelBase*>());
+		.def(py::init<int, int, int, AESLeakageModel::ModelBase*, bool>());
+
+	py::class_<SOCPACudaFP32,SOCPA>(module, "SOCPACudaFP32")
+		.def(py::init<int, int, int, AESLeakageModel::ModelBase*, bool>());
 
 }
 

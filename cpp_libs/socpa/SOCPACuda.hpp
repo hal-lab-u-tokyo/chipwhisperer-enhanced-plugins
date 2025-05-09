@@ -34,17 +34,14 @@ class SOCPACuda : public SOCPA
 {
 public:
 	// Constructor
-	SOCPACuda(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model);
+	SOCPACuda(int byte_length, int num_points, int window_size, AESLeakageModel::ModelBase *model, bool use_shared_mem);
 	~SOCPACuda();
-
 
 protected:
 
 	//device param
 	int shared_mem_per_sm;
 	int global_mem_capacity;
-
-
 
 	// device arrays
 	double *device_traces;
@@ -60,13 +57,17 @@ protected:
 	double *device_sum_trace_x_win2;
 	double *device_sum_trace2_x_win2;
 
-
 	double *device_sum_hypothesis_combined_trace;
 
-	virtual void calculate_sum_hypothesis_trace();
+	double *sum_hypothesis_combined_trace;
 
 	virtual void calculate_hypothesis();
+	virtual void calculate_sum_hypothesis();
+	virtual void calculate_sum_hypothesis_trace();
 	virtual void calculate_sum_trace();
+
+	virtual void run_sum_hypothesis_coumbined_trace_kernel(int start_point, int hyp_offset);
+	virtual void run_sum_hypothesis_coumbined_trace_kernel_nosm(int start_point, int hyp_offset);
 
 	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
@@ -74,6 +75,8 @@ protected:
 						py::array_t<uint8_t> &py_knownkey);
 
 	virtual void calculate_correlation_subkey(Array3D<RESULT_T>* corr);
+
+	bool use_shared_mem;
 
 };
 

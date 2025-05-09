@@ -5,7 +5,7 @@
 #    Project:       sca_toolbox
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  23-01-2024 16:57:09
-#    Last Modified: 07-05-2025 14:23:19
+#    Last Modified: 08-05-2025 17:17:42
 #
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/cpa_algorithms)
@@ -23,7 +23,7 @@ pybind11_add_module(socpa_kernel bind.cpp)
 target_link_libraries(socpa_kernel PRIVATE socpa_common)
 
 if (CUDA_FOUND)
-	pybind11_add_module(socpa_cuda_kernel SOCPACuda.cu)
+	pybind11_add_module(socpa_cuda_kernel SOCPACuda.cu SOCPACudaFP32.cu)
 	target_link_libraries(socpa_cuda_kernel PRIVATE socpa_common)
 endif()
 

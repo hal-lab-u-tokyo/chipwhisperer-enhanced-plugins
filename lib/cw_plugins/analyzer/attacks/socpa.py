@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 09:07:18
-#   Last Modified: 07-05-2025 14:53:15
+#   Last Modified: 08-05-2025 18:16:14
 ###
 
 from chipwhisperer.common.utils.parameter import setupSetParam
@@ -102,7 +102,37 @@ class SOCPAAlogrithmCuda(SOCPAAlogrithm):
     def getSoCpaKernel(self, byte_len, numpoints, model):
         from .cpa_algorithms.socpa_kernel import SOCPA
         from .cpa_algorithms.socpa_cuda_kernel import SOCPACuda
-        return SOCPACuda(byte_len, numpoints, self._window_size, model)
+        return SOCPACuda(byte_len, numpoints, self._window_size, model, True)
+
+class SOCPAAlogrithmCudaNoSM(SOCPAAlogrithm):
+    """
+    Second Order CPA Attack with CUDA (No shared memory)
+    """
+
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        from .cpa_algorithms.socpa_cuda_kernel import SOCPACuda
+        return SOCPACuda(byte_len, numpoints, self._window_size, model, False)
+
+class SOCPAAlogrithmCudaFP32(SOCPAAlogrithm):
+    """
+    Second Order CPA Attack with CUDA (FP32 emulation)
+    """
+
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        from .cpa_algorithms.socpa_cuda_kernel import SOCPACudaFP32
+        return SOCPACudaFP32(byte_len, numpoints, self._window_size, model, True)
+    
+class SOCPAAlogrithmCudaFP32NoSM(SOCPAAlogrithm):
+    """
+    Second Order CPA Attack with CUDA (FP32 emulation, No shared memory)
+    """
+
+    def getSoCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_algorithms.socpa_kernel import SOCPA
+        from .cpa_algorithms.socpa_cuda_kernel import SOCPACudaFP32
+        return SOCPACudaFP32(byte_len, numpoints, self._window_size, model, False)
 
 class SOCPAAlogrithmOpenCL(SOCPAAlogrithm):
     """
@@ -116,7 +146,7 @@ class SOCPAAlogrithmOpenCL(SOCPAAlogrithm):
 
 class SOCPAAlogrithmOpenCLNoSM(SOCPAAlogrithm):
     """
-    Second Order CPA Attack with OpenCL
+    Second Order CPA Attack with OpenCL (No shared memory)
     """
 
     def getSoCpaKernel(self, byte_len, numpoints, model):
@@ -126,7 +156,7 @@ class SOCPAAlogrithmOpenCLNoSM(SOCPAAlogrithm):
 
 class SOCPAAlogrithmOpenCLFP32(SOCPAAlogrithm):
     """
-    Second Order CPA Attack with OpenCL FP32
+    Second Order CPA Attack with OpenCL (FP32 emulation)
     """
 
     def getSoCpaKernel(self, byte_len, numpoints, model):
@@ -136,7 +166,7 @@ class SOCPAAlogrithmOpenCLFP32(SOCPAAlogrithm):
 
 class SOCPAAlogrithmOpenCLFP32NoSM(SOCPAAlogrithm):
     """
-    Second Order CPA Attack with OpenCL FP32 without shared memory
+    Second Order CPA Attack with OpenCL (FP32 emulation, No shared memory)
     """
 
     def getSoCpaKernel(self, byte_len, numpoints, model):

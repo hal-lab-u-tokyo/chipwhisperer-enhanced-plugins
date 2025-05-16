@@ -50,6 +50,7 @@ l10n/
 
 venv*
 *.cwp
+!pytest/*.cwp
 .vscode
 *.npy
 *.egg-info

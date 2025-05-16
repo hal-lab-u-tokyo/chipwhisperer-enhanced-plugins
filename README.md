@@ -21,10 +21,11 @@ git clone --recursive https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-
 * Capture devices
   * Keysight Infiniviion 40000 (MSO-X 4101A tested)
   * Rigol MSO8000 (MSO8104 tested)
+
 * Analysis algorithm
-  * Fast correlation power analysis (FastCPA) with
+  * Fast correlation power analysis (detailed description in [FastCPA](docs/fast_cpa.md)) with
     * OpenMP parallelization
-	* CUDA for NVIDIA GPU
+  	* CUDA for NVIDIA GPU
     * OpenCL for AMD, Intel, Apple GPUs
   * Quad-precision floating-point emulation for double-precision-only CPU (e.g, Apple Silicon CPUs)
   * Double-precision floating-point emulation in OpenCL for single-precision-only GPUs (e.g., Apple Silicon GPUs, Intel Arc GPUs)

@@ -141,7 +141,8 @@ setup(
         "numpy>=1.25.0",
         "ipyfilechooser",
         "pyelftools",
-        "nest_asyncio"
+        "nest_asyncio",
+        "pytest"
     ],
 
     packages=find_packages(where='lib',exclude=['notebooks']),

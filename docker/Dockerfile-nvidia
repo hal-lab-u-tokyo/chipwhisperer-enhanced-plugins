@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.8.1-devel-ubuntu24.04
 
 LABEL maintener="Takuya Kojima <tkojima@hal.ipc.i.u-tokyo.ac.jp>"
 
@@ -11,7 +11,16 @@ RUN apt-get update && apt-get install -y \
 	git \
 	python3-dev \
 	python3-pip \
+	python3-venv \
 	&& rm -rf /var/lib/apt/lists/*
+
+# Make OpenCL work
+RUN mkdir -p /etc/OpenCL/vendors && \
+    echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+
+# create venv
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # pull chipwhisperer and install
 RUN cd /opt && git clone https://github.com/newaetech/chipwhisperer.git && \
@@ -30,6 +39,6 @@ RUN mkdir -p /workspace/notebooks && mkdir /workspace/data
 WORKDIR /workspace
 
 # add entrypoint
-ADD ./docker/launch_notebook.sh /usr/local/bin/launch_notebook.sh
-RUN chmod +x /usr/local/bin/launch_notebook.sh
-CMD [ "/usr/local/bin/launch_notebook.sh" ]
+ADD ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

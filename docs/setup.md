@@ -1,5 +1,6 @@
+# Setup for waveform acquisition
 
-# Required Python Packages
+## Required Python Packages
 ```
 git clone https://github.com/newaetech/chipwhisperer.git
 cd chipwhisperer
@@ -7,13 +8,13 @@ pip3 install .
 pip3 install -r jupyter/requirements.txt
 ```
 
-# Install plugin packages
+## Install plugin packages
 ```
 # clone & cd to this repository
 pip3 install .
 ```
 
-# VISA Driver
+## VISA Driver
 To operate an oscilloscope controllable by VISA, you need the NI-VISA or PyVISA-py driver. Install either one that you prefer.
 
 ## NI-VISA

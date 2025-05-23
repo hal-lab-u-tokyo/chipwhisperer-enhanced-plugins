@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  09-05-2025 18:43:09
-*    Last Modified: 09-05-2025 18:43:25
+*    Last Modified: 23-05-2025 17:25:22
 */
 
 
@@ -340,10 +340,6 @@ void SOCPACudaFP32::setup_arrays(py::array_t<TRACE_T> &py_traces,
 						sum_hypothesis_trace->get_size()));
 	}
 
-	if (device_traces == nullptr) {
-		CUDA_CHECK(cudaMalloc((void**)&device_traces,
-			traces->get_size()));
-	}
 	if (device_traces == nullptr) {
 		CUDA_CHECK(cudaMalloc((void**)&device_traces,
 			traces->get_size()));

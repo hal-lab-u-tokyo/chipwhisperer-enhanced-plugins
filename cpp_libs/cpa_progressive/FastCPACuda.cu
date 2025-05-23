@@ -5,13 +5,14 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:31
-*    Last Modified: 17-02-2024 22:08:56
+*    Last Modified: 23-05-2025 19:02:39
 */
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
 #include "FastCPACuda.hpp"
+#include "FastCPACudaFP32.hpp"
 
 namespace py = pybind11;
 
@@ -22,32 +23,36 @@ namespace py = pybind11;
 
 #include <cuda.h>
 
+// =============================== Base class ===============================
 
-FastCPACuda::FastCPACuda(int num_traces, int num_points, AESLeakageModel::ModelBase *model) : FastCPA(num_traces, num_points, model) {
+FastCPACudaBase::FastCPACudaBase(int num_traces, int num_points, AESLeakageModel::ModelBase *model) : 
+	FastCPA(num_traces, num_points, model)
+{
 
-		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis,
-					sizeof(int64_t) * byte_length * NUM_GUESSES));
-		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_square,
-					sizeof(int64_t) * byte_length * NUM_GUESSES));
+	CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis,
+				sizeof(int64_t) * byte_length * NUM_GUESSES));
+	CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_square,
+				sizeof(int64_t) * byte_length * NUM_GUESSES));
 
-		// copy init data
-		CUDA_CHECK(cudaMemcpy(device_sum_hypothesis, sum_hypothesis->get_pointer(),
-								sum_hypothesis->get_size(),
-								cudaMemcpyHostToDevice));
-		CUDA_CHECK(cudaMemcpy(device_sum_hypothesis_square,
-								sum_hypothesis_square->get_pointer(), \
-								sum_hypothesis_square->get_size(),
-								cudaMemcpyHostToDevice));
+	// copy init data
+	CUDA_CHECK(cudaMemcpy(device_sum_hypothesis, sum_hypothesis->get_pointer(),
+							sum_hypothesis->get_size(),
+							cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMemcpy(device_sum_hypothesis_square,
+							sum_hypothesis_square->get_pointer(), \
+							sum_hypothesis_square->get_size(),
+							cudaMemcpyHostToDevice));
 
-		// init as nullptr
-		// allocated at the first call of setup_arrays becasue the size is not known at this point
-		device_hypothetial_leakage = nullptr;
-		device_traces = nullptr;
-		device_sum_hypothesis_trace = nullptr;
+	// init as nullptr
+	// allocated at the first call of setup_arrays becasue the size is not known at this point
+	device_hypothetial_leakage = nullptr;
+	device_traces = nullptr;
+	device_sum_hypothesis_trace = nullptr;
 
 };
 
-FastCPACuda::~FastCPACuda() {
+FastCPACudaBase::~FastCPACudaBase()
+{
 	cudaFree(device_traces);
 	cudaFree(device_hypothetial_leakage);
 	cudaFree(device_sum_hypothesis);
@@ -56,37 +61,8 @@ FastCPACuda::~FastCPACuda() {
 
 };
 
-void FastCPACuda::setup_arrays(py::array_t<TRACE_T> &py_traces,
-						py::array_t<uint8_t> &py_plaintext,
-						py::array_t<uint8_t> &py_ciphertext,
-						py::array_t<uint8_t> &py_knownkey) {
-	FastCPA::setup_arrays(py_traces, py_plaintext, py_ciphertext, py_knownkey);
 
-	// malloc gpu memory
-	if (device_hypothetial_leakage == nullptr) {
-		CUDA_CHECK(cudaMalloc((void**)&device_hypothetial_leakage,
-						hypothetial_leakage->get_size()));
-	}
-	if (device_sum_hypothesis_trace == nullptr) {
-		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_trace,
-						sum_hypothesis_trace->get_size()));
-		CUDA_CHECK(cudaMemcpy(device_sum_hypothesis_trace,
-								sum_hypothesis_trace->get_pointer(),
-								sum_hypothesis_trace->get_size(),
-								cudaMemcpyHostToDevice));
-	}
-
-	if (device_traces == nullptr) {
-		CUDA_CHECK(cudaMalloc((void**)&device_traces,
-			traces->get_size()));
-	}
-	// copy trace data
-	CUDA_CHECK(cudaMemcpy(device_traces, traces->get_pointer(),
-			traces->get_size(),
-			cudaMemcpyHostToDevice));
-}
-
-void FastCPACuda::calculate_hypothesis()
+void FastCPACudaBase::calculate_hypothesis()
 {
 	FastCPA::calculate_hypothesis();
 	// copy CPU calculated hypothetial_leakage to GPU
@@ -135,8 +111,7 @@ void sum_hypothesis_trace_kernel(int byte_length, int num_guess,
 
 }
 
-
-void FastCPACuda::calculate_correlation_subkey(Array3D<TRACE_T>* diff, QUADFLOAT *sumden2) {
+void FastCPACudaBase::calculate_correlation_subkey(Array3D<TRACE_T>* diff, QUADFLOAT *sumden2) {
 
 	// offload to GPU for sum_hypothesis, sum_hypothesis_square
 	dim3 dimBlock(32);
@@ -148,29 +123,17 @@ void FastCPACuda::calculate_correlation_subkey(Array3D<TRACE_T>* diff, QUADFLOAT
 		throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
 	}
 
-	// offload to GPU for sum_hypothesis_trace
-	dimBlock = dim3(32, 32);
-	dimGrid = dim3(byte_length, (NUM_GUESSES + dimBlock.x - 1) / dimBlock.x, (num_points + dimBlock.y - 1) / dimBlock.y);
-	sum_hypothesis_trace_kernel<<<dimGrid, dimBlock>>>(byte_length, NUM_GUESSES, num_traces, num_points,
-		device_hypothetial_leakage, device_traces, device_sum_hypothesis_trace);
-	err = cudaGetLastError();
-	if (err != cudaSuccess) {
-		throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
-	}
-
 	// copy back
 	CUDA_CHECK(cudaMemcpy((int64_t*)sum_hypothesis->get_pointer(),
-							device_sum_hypothesis,
-							sum_hypothesis->get_size(),
-							cudaMemcpyDeviceToHost));
+		device_sum_hypothesis,
+		sum_hypothesis->get_size(),
+		cudaMemcpyDeviceToHost));
 	CUDA_CHECK(cudaMemcpy((int64_t*)sum_hypothesis_square->get_pointer(),
-							device_sum_hypothesis_square,
-							sum_hypothesis_square->get_size(),
-							cudaMemcpyDeviceToHost));
-	CUDA_CHECK(cudaMemcpy((double*)sum_hypothesis_trace->get_pointer(),
-							device_sum_hypothesis_trace,
-							sum_hypothesis_trace->get_size(),
-							cudaMemcpyDeviceToHost));
+		device_sum_hypothesis_square,
+		sum_hypothesis_square->get_size(),
+		cudaMemcpyDeviceToHost));
+
+	run_sum_hypothesis_trace_kernel();
 
 
 	#ifdef _OPENMP
@@ -193,10 +156,69 @@ void FastCPACuda::calculate_correlation_subkey(Array3D<TRACE_T>* diff, QUADFLOAT
 	}
 }
 
+// =============================== Derived class ===============================
+
+
+void FastCPACuda::setup_arrays(py::array_t<TRACE_T> &py_traces,
+	py::array_t<uint8_t> &py_plaintext,
+	py::array_t<uint8_t> &py_ciphertext,
+	py::array_t<uint8_t> &py_knownkey)
+{
+
+	FastCPA::setup_arrays(py_traces, py_plaintext, py_ciphertext, py_knownkey);
+
+	// malloc gpu memory
+	if (device_hypothetial_leakage == nullptr) {
+		CUDA_CHECK(cudaMalloc((void**)&device_hypothetial_leakage,
+								hypothetial_leakage->get_size()));
+	}
+	if (device_sum_hypothesis_trace == nullptr) {
+		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis_trace,
+					sum_hypothesis_trace->get_size()));
+		CUDA_CHECK(cudaMemcpy(device_sum_hypothesis_trace,
+					sum_hypothesis_trace->get_pointer(),
+					sum_hypothesis_trace->get_size(),
+					cudaMemcpyHostToDevice));
+	}
+
+	if (device_traces == nullptr) {
+		CUDA_CHECK(cudaMalloc((void**)&device_traces,
+					traces->get_size()));
+	}
+	// copy trace data
+	CUDA_CHECK(cudaMemcpy(device_traces, traces->get_pointer(),
+				traces->get_size(),
+				cudaMemcpyHostToDevice));
+}
+
+void FastCPACuda::run_sum_hypothesis_trace_kernel()
+{
+
+	// offload to GPU for sum_hypothesis_trace
+	auto dimBlock = dim3(4, 32);
+	auto dimGrid = dim3(byte_length, (NUM_GUESSES + dimBlock.x - 1) / dimBlock.x, (num_points + dimBlock.y - 1) / dimBlock.y);
+	sum_hypothesis_trace_kernel<<<dimGrid, dimBlock>>>(byte_length, NUM_GUESSES, num_traces, num_points,
+		device_hypothetial_leakage, device_traces, device_sum_hypothesis_trace);
+	auto err = cudaGetLastError();
+	if (err != cudaSuccess) {
+		throw std::runtime_error(std::string("CUDA Error ") + cudaGetErrorString(err));
+	}
+
+	// copy back
+	CUDA_CHECK(cudaMemcpy((double*)sum_hypothesis_trace->get_pointer(),
+							device_sum_hypothesis_trace,
+							sum_hypothesis_trace->get_size(),
+							cudaMemcpyDeviceToHost));
+
+}
+
 PYBIND11_MODULE(cpa_cuda_kernel, module) {
 	module.doc() = "CUDA implemetation plugin for CPA";
 
 	py::class_<FastCPACuda,FastCPA>(module, "FastCPACuda")
+		.def(py::init<int, int, AESLeakageModel::ModelBase*>());
+
+	py::class_<FastCPACudaFP32,FastCPA>(module, "FastCPACudaFP32")
 		.def(py::init<int, int, AESLeakageModel::ModelBase*>());
 
 }

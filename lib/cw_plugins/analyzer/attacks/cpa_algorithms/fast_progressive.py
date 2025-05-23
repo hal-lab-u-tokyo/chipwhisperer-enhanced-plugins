@@ -79,6 +79,12 @@ class FastCPAProgressiveCuda(FastCPAProgressive):
         from .cpa_cuda_kernel import FastCPACuda
         return FastCPACuda(byte_len, numpoints, model)
 
+class FastCPAProgressiveCudaFP32(FastCPAProgressive):
+    def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_kernel import FastCPA
+        from .cpa_cuda_kernel import FastCPACudaFP32
+        return FastCPACudaFP32(byte_len, numpoints, model)
+
 class FastCPAProgressiveOpenCL(FastCPAProgressive):
     def getCpaKernel(self, byte_len, numpoints, model):
         from .cpa_kernel import FastCPA

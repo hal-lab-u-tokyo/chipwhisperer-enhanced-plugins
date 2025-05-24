@@ -53,6 +53,7 @@ venv*
 !pytest/*.cwp
 .vscode
 *.npy
+!pytest/*_data/traces/*.npy
 *.egg-info
 *.so
 *.ipynb_checkpoints

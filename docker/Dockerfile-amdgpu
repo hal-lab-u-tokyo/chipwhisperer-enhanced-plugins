@@ -43,6 +43,14 @@ RUN cd /opt/chipwhisperer-enhanced-plugins && \
 RUN mkdir -p /workspace/notebooks && mkdir /workspace/data
 WORKDIR /workspace
 
+# trick for non-root user setup script
+RUN mkdir /var/tmp/init && chmod o+w /var/tmp/init
+RUN { \
+  echo 'if [ -f "/var/tmp/init/${UID}_bashrc" ]; then'; \
+  echo '  source /var/tmp/init/${UID}_bashrc'; \
+  echo 'fi'; \
+} >> /etc/bash.bashrc
+
 # add entrypoint
 ADD ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

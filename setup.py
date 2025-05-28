@@ -95,18 +95,6 @@ def post_process(installed_path):
         shutil.copy(bit_file, str(copy_dst) + "/" + name + ".bit")
         print("Adding", bit_file, "to", copy_dst)
 
-    print("Search for soft implementation")
-    soft_path = repo_path / "lib" / "cw_plugins" / "targets" / "aes_soft"
-    if soft_path.exists():
-        print("copying soft implementation")
-        dst_path = installed_path / "targets" / "aes_soft"
-        if dst_path.exists():
-            print("remove", dst_path)
-            shutil.rmtree(dst_path)
-
-        print(soft_path, "->", dst_path)
-        shutil.copytree(soft_path, dst_path)
-
 
 class PostDevelopCommand(develop):
     """Post-installation for development mode."""
@@ -147,6 +135,7 @@ setup(
 
     packages=find_packages(where='lib',exclude=['notebooks']),
     package_dir={'': 'lib'},
+    include_package_data=True,
 
     cmdclass={"build_ext": CMakeBuild, "develop": PostDevelopCommand, "install": PostInstallCommand},
     ext_modules=ext_modules,

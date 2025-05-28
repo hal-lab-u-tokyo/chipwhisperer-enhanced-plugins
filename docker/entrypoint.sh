@@ -11,10 +11,11 @@ if [ "$USER_ID" -eq 0 ]; then
 	NOTEBOOK_ARGS="${NOTEBOOK_ARGS} --allow-root"
 else
 	# create temporary home directory
-	export HOME=/tmp/home_${USER_ID}
+	export HOME=/var/tmp/home_${USER_ID}
 	mkdir -p "$HOME"
 	export XDG_RUNTIME_DIR="$HOME/.xdg"
 	mkdir -p "$XDG_RUNTIME_DIR"
+	echo "export HOME=${HOME}" >> /var/tmp/init/${USER_ID}_bashrc
 
 	# prepare directories for jupyter
 	mkdir -p "$HOME/.local"

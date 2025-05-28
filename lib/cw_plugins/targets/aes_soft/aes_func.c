@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  21-07-2024 20:22:55
-*    Last Modified: 16-05-2025 11:56:00
+*    Last Modified: 17-05-2025 02:36:04
 */
 
 #include "aes_func.h"
@@ -129,6 +129,7 @@ void masking_sbox(mask_t *mask)
 // #pragma GCC push_options
 // #pragma GCC optimize ("O0")
 
+// __attribute__((optnone))
 __attribute__((noinline))
 void remasking(uint8_t *state, mask_t *mask)
 {

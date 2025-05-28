@@ -3,8 +3,8 @@ import os
 from Crypto.Cipher import AES
 import numpy as np
 
-UNMASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/aes_unmasked.elf")
-MASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/aes_masked.elf")
+UNMASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/cw305/aes_unmasked.elf")
+MASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/cw305/aes_masked.elf")
 
 class CW305RISCVAES128bit(CW305VexRISCVBase):
     CMD_SET_KEY 		= 0x11

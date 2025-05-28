@@ -4,11 +4,11 @@
 ###
 #   Copyright (C) 2024 The University of Tokyo
 #   
-#   File:          /Downloads/sca_toolbox/scripts/cw2daredevil.py
+#   File:          /Daredevil/cw2daredevil.py
 #   Project:       kojimatakuya
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  03-05-2024 17:15:24
-#   Last Modified: 05-05-2024 19:03:35
+#   Last Modified: 16-05-2024 17:40:05
 ###
 
 import chipwhisperer as cw
@@ -115,10 +115,17 @@ def main():
     with open(config_filename, "w") as cf:
         cf.write(config_str)
 
+    # selected traces
+    traces = np.array([t.wave[sample_range] for t in project.traces[:num_traces]])
+    max_ampl = np.max(traces)
+    min_ampl = np.min(traces)
+    # normalized
+    traces = (traces - min_ampl) / (max_ampl - min_ampl)
+
     # save traces and plaintext
     with open(traces_filename, "wb") as tf, open(plaintext_filename, "wb") as pf:
-        for t in project.traces[:num_traces]:
-            tf.write(np.array(t.wave[sample_range]).astype(dtype_dict[args.data_type]).tobytes())
+        for i, t in enumerate(project.traces[:num_traces]):
+            tf.write(np.array(traces[i]).astype(dtype_dict[args.data_type]).tobytes())
             pf.write(np.array(t.textin, dtype=np.uint8).tobytes())
 
 

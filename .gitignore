@@ -57,3 +57,5 @@ venv*
 *.egg-info
 *.so
 *.ipynb_checkpoints
+
+*.o

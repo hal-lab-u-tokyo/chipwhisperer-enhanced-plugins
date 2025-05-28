@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  30-01-2024 12:30:39
-*    Last Modified: 07-05-2025 14:30:10
+*    Last Modified: 28-05-2025 02:34:18
 */
 
 #ifndef OCL_SUM_HYPOTHESIS
@@ -136,7 +136,7 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE(
 		const int point_offset = get_global_id(2);
 		const int point_index = point_offset + start_point;
 		const int trace_offset = get_group_id(0) * trace_per_block;
-		// const int end_trace = min(trace_per_block, num_traces - trace_offset);
+		const int end_trace = min(trace_per_block, num_traces - trace_offset);
 		const int end_window = min(window_size, num_points - point_index - 1);
 
 		if (point_index < num_points) {
@@ -154,7 +154,7 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE(
 
 			for (int w = get_local_id(1); w < end_window; w += window_per_block) {
 				double sum = 0;
-				for (int t = 0; t < trace_per_block; t++) {
+				for (int t = 0; t < end_trace; t++) {
 					sum += hyp_cache[t] * trace_cache[t * CACHE_DIM_Y + p_lid] * traces[(trace_offset + t) * num_points + point_index + w + 1];
 				}
 				atomic_add_double(&sum_hypothesis_combined_trace[point_offset * window_size + w], sum);
@@ -353,7 +353,7 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32(
 		const int point_offset = get_global_id(2);
 		const int point_index = point_offset + start_point;
 		const int trace_offset = get_group_id(0) * trace_per_block;
-		// const int end_trace = min(trace_per_block, num_traces - trace_offset);
+		const int end_trace = min(trace_per_block, num_traces - trace_offset);
 		const int end_window = min(window_size, num_points - point_index - 1);
 
 		if (point_index < num_points) {
@@ -372,7 +372,7 @@ OCL_SUM_HYPOTHESIS_COMBINED_TRACE_FP32(
 
 			for (int w = get_local_id(1); w < end_window; w += window_per_block) {
 				float2 sum = {0, 0};
-				for (int t = 0; t < trace_per_block; t++) {
+				for (int t = 0; t < end_trace; t++) {
 					// sum += hyp_cache[t] * trace_cache[t * CACHE_DIM_Y + p_lid] * traces[(trace_offset + t) * num_points + point_index + w + 1];
 					float2 prod = df64_mul(hyp_cache[t], trace_cache[t * CACHE_DIM_Y + p_lid]);
 					prod = df64_mul(prod, traces[(trace_offset + t) * num_points + point_index + w + 1]);

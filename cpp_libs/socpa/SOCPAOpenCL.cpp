@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  03-05-2025 05:56:52
-*    Last Modified: 07-05-2025 15:16:58
+*    Last Modified: 28-05-2025 02:38:09
 */
 
 
@@ -106,7 +106,7 @@ SOCPAOpenCLBase::SOCPAOpenCLBase(int byte_length, int num_points, int window_siz
 	// determine tile size no to ocupy more than 50% of the global memory for the temporary array
 	point_tile_size = 1 << static_cast<int>(std::ceil(std::log2(num_points)));
 
-	while ((sizeof(double) * point_tile_size * num_points) > (global_mem_size / 2)) {
+	while ((sizeof(double) * point_tile_size * window_size) > (global_mem_size / 2)) {
 		point_tile_size /= 2;
 	}
 
@@ -205,14 +205,6 @@ void SOCPAOpenCLBase::build_kernel_programs()
 
 	err = clBuildProgram(sum_hypothesis_combined_trace_kernel_program, 1, &device_id, nullptr, nullptr, nullptr);
 	if (err != CL_SUCCESS) {
-		// get log
-		size_t log_size;
-		clGetProgramBuildInfo(sum_hypothesis_combined_trace_kernel_program,
-							device_id, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
-		vector<char> log(log_size);
-		clGetProgramBuildInfo(sum_hypothesis_combined_trace_kernel_program,
-							device_id, CL_PROGRAM_BUILD_LOG, log_size, log.data(), nullptr);
-		fprintf(stderr, "%s\n", log.data());
 		throw runtime_error("Error: Failed to build program \"sum_hypothesis_combined_trace_kernel\" ("
 							+ to_string(err) + ")");
 	}

@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  01-02-2025 09:16:59
-*    Last Modified: 09-05-2025 18:43:18
+*    Last Modified: 28-05-2025 02:37:38
 */
 
 
@@ -43,12 +43,11 @@ SOCPACuda::SOCPACuda(int byte_length, int num_points, int window_size, AESLeakag
 		// determine tile size no to ocupy more than 50% of the global memory for the temporary array
 		point_tile_size = 1 << static_cast<int>(std::ceil(std::log2(num_points)));
 
-		while ((sizeof(double) * point_tile_size * num_points) > (global_mem_capacity / 2)) {
+		while ((sizeof(double) * point_tile_size * window_size) > (global_mem_capacity / 2)) {
 			point_tile_size /= 2;
 		}
 
 		point_tile_size = std::min(point_tile_size, num_points);
-
 
 		// allocate memory on the GPU
 		CUDA_CHECK(cudaMalloc((void**)&device_sum_hypothesis,
@@ -357,6 +356,9 @@ void SOCPACuda::run_sum_hypothesis_coumbined_trace_kernel_nosm(int start_point, 
 void SOCPACuda::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 {
 
+	QUADFLOAT div_n = (QUADFLOAT)(1.0/(double)num_traces);
+	QUADFLOAT div_nn = SQUARE(div_n);
+
 	for (int byte_index = 0; byte_index < byte_length; byte_index++) {
 		for (int guess = 0; guess < NUM_GUESSES; guess++) {
 
@@ -397,12 +399,12 @@ void SOCPACuda::calculate_correlation_subkey(Array3D<RESULT_T>* corr)
 							auto s11 = (QUADFLOAT)sum_trace2_x_win2->at(p, w);
 							auto s7 = sum_hypothesis_trace->at(byte_index, guess, p + w + 1);
 							auto s10 = sum_hypothesis_combined_trace[pp * window_size + w];
-							QUADFLOAT n_lambda3 = (QUADFLOAT)num_traces * s11 
-									- 2.0 * (s2 * s12 + s1 * s13)  +
-									(SQUARE(s2) * s6 + 4.0 * s1 * s2 * s4 + SQUARE(s1) * s8) / (QUADFLOAT)num_traces -
-									3.0 * SQUARE(s1 * s2) / (QUADFLOAT)SQUARE(num_traces);
-							QUADFLOAT lambda2 = s4 - (s1 * s2)/(QUADFLOAT)num_traces;
-							QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3)/ (QUADFLOAT)num_traces;
+							QUADFLOAT n_lambda3 = (QUADFLOAT)num_traces * s11 -
+									QUADFLOAT(2.0) * (s2 * s12 + s1 * s13)  +
+									(SQUARE(s2) * s6 + QUADFLOAT(4.0) * s1 * s2 * s4 + SQUARE(s1) * s8) * div_n -
+									QUADFLOAT(3.0) * SQUARE(s1 * s2) * div_nn;
+							QUADFLOAT lambda2 = s4 - (s1 * s2) * div_n;
+							QUADFLOAT n_lambda1 = (QUADFLOAT)num_traces * s10 - (s1 * s7 + s2 * s5) + (s1 * s2 * s3) * div_n;
 							RESULT_T corr = (RESULT_T)(n_lambda1 - lambda2 * s3) /
 											std::sqrt((RESULT_T)(((n_lambda3 - SQUARE(lambda2)) * (num_traces * s9 - SQUARE(s3)))));
 

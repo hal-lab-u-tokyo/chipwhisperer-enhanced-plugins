@@ -1,3 +1,12 @@
+###
+#   Copyright (C) 2025 The University of Tokyo
+#   
+#   File:          /lib/cw_plugins/analyzer/attacks/cpa_algorithms/fast_progressive.py
+#   Project:       sca_toolbox
+#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+#   Created Date:  30-05-2025 08:02:45
+#   Last Modified: 30-05-2025 08:02:50
+###
 import numpy as np
 
 from chipwhisperer.analyzer.attacks.algorithmsbase import AlgorithmsBase
@@ -5,6 +14,7 @@ from chipwhisperer.logging import *
 
 
 from .models import get_c_model
+
 
 class FastCPAProgressive(AlgorithmsBase):
     """
@@ -55,7 +65,6 @@ class FastCPAProgressive(AlgorithmsBase):
                 part_textout = np.array([traceSource.get_textout(t + tracerange[0]) for t in trange])
 
             part_knownkey = np.array([traceSource.get_known_key(t + tracerange[0]) for t in trange])
-
             diff = cpa.calculate_correlation(part_trace, part_textin, part_textout, part_knownkey)
 
             for bnum in self.brange:

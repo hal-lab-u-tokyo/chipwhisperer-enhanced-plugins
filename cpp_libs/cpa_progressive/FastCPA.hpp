@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:54
-*    Last Modified: 12-03-2024 16:41:45
+*    Last Modified: 30-05-2025 07:36:30
 */
 
 #ifndef FAST_CPA_H
@@ -60,6 +60,8 @@ protected:
 	int num_points;
 	int num_guesses;
 	int total_traces;
+	int point_tile_size;
+
 	AESLeakageModel::ModelBase *model;
 
 	Array2D<TRACE_T> *traces; // [0:num_traces][0:num_points]

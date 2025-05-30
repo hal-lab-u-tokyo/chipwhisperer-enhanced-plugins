@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  30-05-2025 08:02:45
-#   Last Modified: 30-05-2025 08:02:50
+#   Last Modified: 30-05-2025 09:27:24
 ###
 import numpy as np
 
@@ -33,12 +33,11 @@ class FastCPAProgressive(AlgorithmsBase):
 
     def getCpaKernel(self, byte_len, numpoints, model):
         from .cpa_kernel import FastCPA
-        return FastCPA(byte_len, numpoints, model)
+        return FastCPA(byte_len, numpoints, model, False)
 
     def addTraces(self, traceSource, tracerange, progressBar=None, pointRange=None):
         numtraces = tracerange[1] - tracerange[0]
         numpoints = pointRange[1] - pointRange[0]
-
 
         byte_len = max(self.brange) + 1
 
@@ -81,6 +80,12 @@ class FastCPAProgressive(AlgorithmsBase):
                 self.sr()
 
         del cpa
+
+class FastCPAProgressiveTiling(FastCPAProgressive):
+    def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_kernel import FastCPA
+        return FastCPA(byte_len, numpoints, model, True)
+
 
 class FastCPAProgressiveCuda(FastCPAProgressive):
     def getCpaKernel(self, byte_len, numpoints, model):

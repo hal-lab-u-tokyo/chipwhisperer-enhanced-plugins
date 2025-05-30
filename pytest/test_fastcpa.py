@@ -5,12 +5,12 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  14-05-2025 07:47:08
-#   Last Modified: 23-05-2025 18:22:18
+#   Last Modified: 30-05-2025 09:25:28
 ###
 
 import chipwhisperer as cw
 import chipwhisperer.analyzer as cwa
-from cw_plugins.analyzer.attacks.cpa_algorithms.fast_progressive import FastCPAProgressive, FastCPAProgressiveCuda,  FastCPAProgressiveOpenCL, FastCPAProgressiveOpenCLFP32, FastCPAProgressiveCudaFP32
+from cw_plugins.analyzer.attacks.cpa_algorithms.fast_progressive import FastCPAProgressive, FastCPAProgressiveTiling, FastCPAProgressiveCuda,  FastCPAProgressiveOpenCL, FastCPAProgressiveOpenCLFP32, FastCPAProgressiveCudaFP32
 
 import pytest
 
@@ -48,6 +48,11 @@ def run_attack(attack, ref_result):
 def test_fastcpa_cpu(test_data):
     proj, model, ref_result = test_data
     attack = cwa.cpa(proj, model, FastCPAProgressive)
+    run_attack(attack, ref_result)
+
+def test_fastcpa_tiling_cpu(test_data):
+    proj, model, ref_result = test_data
+    attack = cwa.cpa(proj, model, FastCPAProgressiveTiling)
     run_attack(attack, ref_result)
 
 

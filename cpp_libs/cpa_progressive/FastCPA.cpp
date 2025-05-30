@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 30-05-2025 08:37:36
+*    Last Modified: 30-05-2025 09:35:01
 */
 
 
@@ -37,15 +37,6 @@ py::array_t<RESULT_T> FastCPA::calculate_correlation(py::array_t<TRACE_T> &py_tr
 	setup_arrays(py_traces, py_plaintext, py_ciphertext, py_knownkey);
 	total_traces += num_traces;
 
-	point_tile_size = num_points;
-	point_tile_size = 1 << int(ceil(log2(num_points)));
-	while ((sizeof(TRACE_T) * point_tile_size * num_traces) > LOCAL_SAMPLE_SIZE) {
-		point_tile_size /= 2;
-		if (point_tile_size < 64) {
-			break;
-		}
-	}
-
 	update_sum_trace();
 
 	QUADFLOAT *sumden2 = new QUADFLOAT[num_points];
@@ -56,7 +47,20 @@ py::array_t<RESULT_T> FastCPA::calculate_correlation(py::array_t<TRACE_T> &py_tr
 	py::array_t<RESULT_T> py_diff({byte_length, NUM_GUESSES, num_points});
 	Array3D<RESULT_T>* diff = new Array3D<RESULT_T>((RESULT_T*)py_diff.request().ptr,
 											byte_length, NUM_GUESSES, num_points);
-	calculate_correlation_subkey(diff, sumden2);
+	if (enable_tiling) {
+		// set tile size
+		point_tile_size = num_points;
+		point_tile_size = 1 << int(ceil(log2(num_points)));
+		while ((sizeof(TRACE_T) * point_tile_size * num_traces) > LOCAL_SAMPLE_SIZE) {
+			point_tile_size /= 2;
+			if (point_tile_size < 64) {
+				break;
+			}
+		}
+		calculate_correlation_subkey_tiling(diff, sumden2);
+	} else {
+		calculate_correlation_subkey(diff, sumden2);
+	}
 
 	delete[] sumden2;
 
@@ -153,7 +157,44 @@ void FastCPA::calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *s
 
 
 	#ifdef _OPENMP
-	#pragma omp parallel for collapse(2) private(sumden1) schedule(guided, byte_length)
+	#pragma omp parallel for collapse(2) private(sumden1) schedule(dynamic)
+	#endif
+	for (int guess = 0; guess < NUM_GUESSES; guess++) {
+		for (int byte_index = 0; byte_index < byte_length; byte_index++) {
+			for (int t = 0; t < num_traces; t++) {
+				auto hyp = hypothetial_leakage->at(byte_index, guess, t);
+				sum_hypothesis->at(byte_index, guess) += hyp;
+				sum_hypothesis_square->at(byte_index, guess) += SQUARE(hyp);
+				for (int p = 0; p < num_points; p++) {
+					sum_hypothesis_trace->at(byte_index, guess, p)
+						+= hyp * traces->at(t, p);
+				}
+			}
+
+			// calc sumden1
+			sumden1 = SQUARE(sum_hypothesis->at(byte_index, guess))
+			- total_traces * sum_hypothesis_square->at(byte_index, guess);
+
+			// calc sumnum
+			for (int p = 0; p < num_points; p++) {
+				QUADFLOAT sumnum = (QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
+					- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
+
+				diff->at(byte_index, guess, p) = (RESULT_T)sumnum / std::sqrt((RESULT_T)sumden1 * (RESULT_T)sumden2[p]);
+			}
+
+		}
+	}
+
+}
+
+void FastCPA::calculate_correlation_subkey_tiling(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2) {
+
+	QUADFLOAT sumden1;
+
+
+	#ifdef _OPENMP
+	#pragma omp parallel for collapse(2) private(sumden1) schedule(dynamic)
 	#endif
 	for (int guess = 0; guess < NUM_GUESSES; guess++) {
 		for (int byte_index = 0; byte_index < byte_length; byte_index++) {

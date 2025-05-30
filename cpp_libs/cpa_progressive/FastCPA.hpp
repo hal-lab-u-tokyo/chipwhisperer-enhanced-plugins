@@ -35,8 +35,8 @@ class FastCPA {
 public:
 	const int NUM_GUESSES = 256;
 	// Constructor
-	FastCPA(int byte_length, int num_points, AESLeakageModel::ModelBase *model) :
-		byte_length(byte_length), num_points(num_points), total_traces(0), model(model) {
+	FastCPA(int byte_length, int num_points, AESLeakageModel::ModelBase *model, bool enable_tiling = false) :
+		byte_length(byte_length), num_points(num_points), total_traces(0), model(model), enable_tiling(enable_tiling) {
 
 		// init arrays
 		sum_trace = new QUADFLOAT[num_points]();
@@ -60,6 +60,9 @@ protected:
 	int num_points;
 	int num_guesses;
 	int total_traces;
+
+	// tiling
+	bool enable_tiling;
 	int point_tile_size;
 
 	AESLeakageModel::ModelBase *model;
@@ -84,6 +87,7 @@ protected:
 	virtual void calclualte_sumden2(QUADFLOAT *sumden2);
 	virtual void calculate_hypothesis();
 	virtual void calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2);
+	void calculate_correlation_subkey_tiling(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2);
 
 
 	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,

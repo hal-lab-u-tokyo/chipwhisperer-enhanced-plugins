@@ -1,67 +1,69 @@
 # Chipwhisperer-Enhanced-Plugins
-This repository contains enhanced plugins for Chipwhisperer.
-The plugins are designed to be used with the Chipwhisperer platform.
+This repository provides enhanced plugins for the [Chipwhisperer](https://github.com/newaetech/chipwhisperer) framework, which is a popular platform for hardware security research. The plugins extend the capabilities of Chipwhisperer by providing support for various hardware platforms, capture devices, and analysis algorithms, as shown in the figure below.
 
-## Clone this repository
-This repository contains submodules. To clone this repository, use the following command:
+<img src="./docs/assets/images/overview.png" alt="Chipwhisperer Enhanced Plugins Overview" width="300">
+
+[Detailed documentation](./docs/README.md) is available in the `docs` directory.
+
+Technical details of the plugins are also described in the following paper:
+```
+To be added
+```
+
+## Extended features
+### Supported hardware platforms
+* SAKURA-X board configured with SASEBO-GIII sample design
+* ESP32
+* [SAKURA-X shell](https://github.com/hal-lab-u-tokyo/sakura-x-shell)
+* [CW305-shell](https://github.com/hal-lab-u-tokyo/cw305-shell)
+* [VexRiscv_SCA](https://github.com/hal-lab-u-tokyo/VexRiscv_SCA)
+* AES Examples in [sca_design_repo](https://github.com/hal-lab-u-tokyo/sca_design_repo) based on the both shells
+  * RTL implementations and HLS implementations
+
+
+### Capture devices
+* VISA compatible oscilloscopes
+  * Keysight Infiniviion 40000 (MSO-X 4101A tested)
+  * Rigol MSO8000 (MSO8104 tested)
+You can integrate your own VISA-compatible oscilloscopes by creating a custom class that inherits from the provided base class.
+
+### Analysis algorithms
+* Many-core/GPU-accelerated Correlation Power Analysis
+  * OpenMP parallelization for multi-core CPUs
+  * CUDA for NVIDIA GPUs
+  * OpenCL for NVIDIA, AMD, Intel and Apple GPUs
+  * Quad-precision floating-point emulation for double-precision-only CPU (e.g, Apple Silicon CPUs)
+  * Double-precision floating-point emulation in OpenCL for single-precision-only GPUs (e.g., Apple Silicon GPUs, Intel Arc GPUs)
+
+
+## Note for Cloning
+
+This repository uses submodules to manage dependencies and related projects. To ensure all submodules are properly initialized and updated, use the following command when cloning:
+
 ```
 git clone --recursive https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins
 ```
 
-## Extended features
-* Target devices (See [hardware](docs/hardware.md) for details)
-  * SAKURA-X board configured with SASEBO-GIII sample design
-  * ESP32
-  * [SAKURA-X shell](https://github.com/hal-lab-u-tokyo/sakura-x-shell)
-  * [VexRiscv_SCA](https://github.com/hal-lab-u-tokyo/VexRiscv_SCA)
-  * [CW305-shell](https://github.com/hal-lab-u-tokyo/cw305-shell)
-  * AES Examples in [sca_design_repo](https://github.com/hal-lab-u-tokyo/sca_design_repo) based on the both shells
-    * RTL implementations and HLS implementations
+If you have already cloned the repository without the `--recursive` flag, you can initialize and update the submodules manually by running:
 
-* Capture devices
-  * Keysight Infiniviion 40000 (MSO-X 4101A tested)
-  * Rigol MSO8000 (MSO8104 tested)
+```bash
+git submodule update --init --recursive
+```
 
-* Analysis algorithm
-  * Fast correlation power analysis (detailed description in [FastCPA](docs/fast_cpa.md)) with
-    * OpenMP parallelization
-  	* CUDA for NVIDIA GPU
-    * OpenCL for AMD, Intel, Apple GPUs
-  * Quad-precision floating-point emulation for double-precision-only CPU (e.g, Apple Silicon CPUs)
-  * Double-precision floating-point emulation in OpenCL for single-precision-only GPUs (e.g., Apple Silicon GPUs, Intel Arc GPUs)
-
-## Contents
+## Directory structure
 * lib: python library source
 * hardware: target hardware related files and submodules
-* notebooks: Jupyter Notebook files as examples
+* notebooks: Sample Jupyter Notebooks
 * udev-rules: udev rule file for devices related to side-channel attack evaluation
-* docs: documents
+* docs: documentation files
 * cpp_libs: C++ library source
-* docker: Dockerfile for building a docker image
-
-## Setup guides
-### Capturing traces
-See [Setup](docs/setup.md)
-### Analysis
-It is recommended that the Docker image be used with docker-compose.
-
-See [docker](docs/docker.md)
-
-For MacOS users, [install_mac.sh](./install_mac.sh) is provided to install this repository and its dependencies.
+* docker: Dockerfile for building docker images and docker-compose files for running the analysis environment
 
 ## Getting Started
-### Acquiring traces
-[acquire_traces](notebooks/acquire_traces.ipynb) is a sample notebook for acquiring traces using VISA compatible oscilloscopes.
+See the Setup Guide of [documentation](./docs/README.md) for instructions on how to set up the environment and run the analysis.
 
-### Analysis with FastCPA
-[fastcpa_example](notebooks/fastcpa_example.ipynb) is a sample notebook for analyzing traces using FastCPA.
+## Tutorials
 
-#### OpenCL device selection
-If you have multiple OpenCL devices, you can specify the device to use by setting the `CL_PLATFORM` and `CL_DEVICE` environment variables.
-
-# Known Issues
-The OpenCL implementation of FastCPA in Apple Silicon GPUs may provide incorrect results when a large number of traces and a long waveform are used.
-In this case, the update interval should be set to a smaller value.
 
 ## Special Thanks to Those Who Assisted in this development
 * Masaki Morita

@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 09:07:18
-#   Last Modified: 08-05-2025 18:16:14
+#   Last Modified: 17-06-2025 07:21:32
 ###
 
 from chipwhisperer.common.utils.parameter import setupSetParam
@@ -28,6 +28,8 @@ class SOCPAAlogrithm(AlgorithmsBase):
     def __init__(self):
         super().__init__()
         self._window_size = 1
+        self.point_tile_size = None
+        self.trace_tile_size = None
 
     def set_window_size(self, winsize):
         self._window_size = winsize
@@ -47,6 +49,11 @@ class SOCPAAlogrithm(AlgorithmsBase):
         from .cpa_algorithms.socpa_kernel import SOCPA
         return SOCPA(byte_len, numpoints, self._window_size, model)
 
+    def set_point_tile_size(self, tile_size):
+        self.point_tile_size = tile_size
+
+    def set_trace_tile_size(self, tile_size):
+        self.trace_tile_size = tile_size
 
     def addTraces(self, traceSource, tracerange, progressBar=None, pointRange=None):
 
@@ -62,6 +69,14 @@ class SOCPAAlogrithm(AlgorithmsBase):
         model = get_c_model(self.model)
 
         socpa = self.getSoCpaKernel(byte_len, numpoints, model)
+
+        if self.point_tile_size is not None:
+            point_tile_size = min(self.point_tile_size, numpoints)
+            socpa.set_point_tile_size(point_tile_size)
+
+        if self.trace_tile_size is not None:
+            trace_tile_size = min(self.trace_tile_size, numtraces)
+            socpa.set_trace_tile_size(trace_tile_size)
 
         trange = range(0, numtraces)
         part_trace = np.array([traceSource.get_trace(t + tracerange[0])[pointRange[0]:pointRange[1]] for t in trange])
@@ -177,7 +192,7 @@ class SOCPAAlogrithmOpenCLFP32NoSM(SOCPAAlogrithm):
 class SOCPA(AttackBaseClass):
     """Second Order CPA Attack"""
 
-    def __init__(self, proj, algorithm : SOCPAAlogrithm, leak_model : ModelsBase):
+    def __init__(self, proj, leak_model : ModelsBase, algorithm : SOCPAAlogrithm):
         self._analysisAlgorithm = algorithm()
         super().__init__()
         self.updateScript()
@@ -211,6 +226,12 @@ class SOCPA(AttackBaseClass):
 
     def get_trace_range(self):
         return (self.get_trace_start(), self.get_trace_end())
+
+    def set_trace_tile_size(self, tile_size):
+        self.attack.set_trace_tile_size(tile_size)
+
+    def set_point_tile_size(self, tile_size):
+        self.attack.set_point_tile_size(tile_size)
 
     @property
     def window_size(self):

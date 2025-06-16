@@ -1,6 +1,13 @@
-# Build image
-Execute the following command at the root of the repository:
+First, ensure you have Docker installed on your system. You can find installation instructions on the [Docker website](https://docs.docker.com/get-docker/).
+As recommended, it is better to docker compose (v2) integrated with Docker CLI to run the container, instead of using the legacy docker-compose command.
 
+# Docker Compose File Variants
+
+This repository includes multiple Docker Compose files tailored for different platforms. By overriding the default `docker-compose.yml` file with one of the files listed below, you can build and run containers optimized for your desired platform.
+
+All the following commands are executed at the root of the repository.
+
+# Building the Docker Image
 ## OpenMP enabled image (default)
 ```bash
 docker compose build
@@ -21,7 +28,7 @@ docker compose -f docker-compose.yml -f docker/docker-compose.override.amdgpu.ym
 docker compose -f docker-compose.yml -f docker/docker-compose.override.intel-gpu.yml build
 ```
 
-# Run container
+# Running the Docker Container
 The container launches a Jupyter Notebook server.
 
 ## Common options
@@ -59,7 +66,7 @@ If you want to specify the OpenCL platform and device ID, add the following envi
 ## Note for OpenCL enabled container for Intel GPU
 The OpenCL platform and device ID can be specified in the same way as for AMDGPU.
 
-# Connect to the container
+# Connecting to the container
 ## Jupyter Notebook
 After starting the container, you can access the Jupyter Notebook server by opening a web browser and navigating to:
 ```
@@ -81,7 +88,7 @@ Other than jupyter notebook, you can also run the following command to start a b
 ```bash
 docker compose exec -it notebook /bin/bash
 ```
-or 
+or
 ```bash
 docker exec -it chipwhisperer-notebook /bin/bash
 ```

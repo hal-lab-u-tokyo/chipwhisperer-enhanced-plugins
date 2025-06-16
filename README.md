@@ -64,6 +64,9 @@ See the Setup Guide of [documentation](./docs/README.md) for instructions on how
 
 ## Tutorials
 
+## Our Related Projects
+* [cw_ml_plugins](https://github.com/hal-lab-u-tokyo/cw_ml_plugin): A collection of machine learning based attack plugins for ChipWhisperer.
+
 
 ## Special Thanks to Those Who Assisted in this development
 * Masaki Morita

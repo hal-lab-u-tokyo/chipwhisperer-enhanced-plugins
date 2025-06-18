@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 09:07:18
-#   Last Modified: 17-06-2025 07:21:32
+#   Last Modified: 18-06-2025 10:52:26
 ###
 
 from chipwhisperer.common.utils.parameter import setupSetParam
@@ -240,6 +240,12 @@ class SOCPA(AttackBaseClass):
     @window_size.setter
     def window_size(self, winsize):
         self.attack.set_window_size(winsize)
+
+
+    # report interval is not used in SOCPA but we keep it for compatibility with jupyter notebooks callbacks
+    @property
+    def reporting_interval(self):
+        return self.get_trace_end() - self.get_trace_start() + 1
 
     def process_known_key(self, inpkey):
         if inpkey is None:

@@ -63,6 +63,10 @@ See the Setup Guide of [documentation](./docs/README.md) for instructions on how
 
 ## Tutorials
 * [Tutorial 1: 1st-order CPA on DPA Contest V2 dataset](./notebooks/tutorial_cpa.ipynb)
+* [Tutorial 2: 2nd-order CPA on ASCAD dataset](./notebooks/tutorial_socpa.ipynb)
+
+## Open Datasets
+We plan to release datasets generated using this framework, as described in the aforementioned paper, in the near future.
 
 ## Our Related Projects
 * [cw_ml_plugins](https://github.com/hal-lab-u-tokyo/cw_ml_plugin): A collection of machine learning based attack plugins for ChipWhisperer.

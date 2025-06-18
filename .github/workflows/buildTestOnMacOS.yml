@@ -1,0 +1,12 @@
+name: Build Verification for macOS
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build_test:
+    uses: ./.github/workflows/reusableBuildOnMacOS.yml
+    with:
+      python_versions: '["3.10.17", "3.11.12", "3.12.10"]'

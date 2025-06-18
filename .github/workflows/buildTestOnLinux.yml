@@ -1,0 +1,12 @@
+name: Build Verification for Linux
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build_test:
+    uses: ./.github/workflows/reusableBuildOnLinux.yml
+    with:
+      python_version: ["3.10.17", "3.11.12", "3.12.10"]

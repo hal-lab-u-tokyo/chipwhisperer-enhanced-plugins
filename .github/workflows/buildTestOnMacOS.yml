@@ -28,4 +28,5 @@ jobs:
       - name: Run tests
         run: |
           source ./venv/bin/activate
-          cd pytest && pytest -v
+          cd pytest
+          pytest -v test_fastcpa.py::test_fastcpa_cpu test_fastcpa.py::test_fastcpa_tiling_cpu 

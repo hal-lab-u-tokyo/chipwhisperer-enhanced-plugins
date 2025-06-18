@@ -6,8 +6,8 @@ This repository provides enhanced plugins for the [Chipwhisperer](https://github
 [Detailed documentation](./docs/README.md) is available in the `docs` directory.
 
 Technical details of the plugins are also described in the following paper:
-Cryptology ePrint Archive, Report 2025/1130 (a preprint version of the paper, https://eprint.iacr.org/2025/1130.pdf)
 
+Takuya Kojima, Masaki Morita, Hideki Takase, and Hiroshi Nakamura, "An Open-Source Framework for Efficient Side-Channel Analysis on Cryptographic Implementations", Cryptology ePrint Archive, Report 2025/1130 (a preprint version of the paper, https://eprint.iacr.org/2025/1130)
 
 ## Extended features
 ### Supported hardware platforms
@@ -62,7 +62,7 @@ git submodule update --init --recursive
 See the Setup Guide of [documentation](./docs/README.md) for instructions on how to set up the environment and run the analysis.
 
 ## Tutorials
-Under preparation.
+* [Tutorial 1: 1st-order CPA on DPA Contest V2 dataset](./notebooks/tutorial_cpa.ipynb)
 
 ## Our Related Projects
 * [cw_ml_plugins](https://github.com/hal-lab-u-tokyo/cw_ml_plugin): A collection of machine learning based attack plugins for ChipWhisperer.

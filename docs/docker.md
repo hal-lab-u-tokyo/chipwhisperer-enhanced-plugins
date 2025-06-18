@@ -4,19 +4,38 @@ As recommended, it is better to docker compose (v2) integrated with Docker CLI t
 # Docker Compose File Variants
 
 This repository includes multiple Docker Compose files tailored for different platforms. By overriding the default `docker-compose.yml` file with one of the files listed below, you can build and run containers optimized for your desired platform.
+For OpenMP and CUDA images, pre-built images are available.
+For more details about the pre-built images, visit the Docker Hub repository: [cw-ext-notebooks](https://hub.docker.com/repository/docker/tkojima0107/cw-ext-notebooks/).
+These images are updated with each release and can be used directly without the need for manual builds.
+For other images, you have to build them from source using the provided Dockerfiles, as detailed in the sections below.
+For users who prefer to work with the latest source code, building the Docker images from source is recommended.
 
 All the following commands are executed at the root of the repository.
 
-# Building the Docker Image
+# Preparing the Docker Image
 ## OpenMP enabled image (default)
 ```bash
 docker compose build
 ```
+Alternatively, you can use the pre-built image for the OpenMP-enabled container instead of building it from source. To do so, run the following command:
+
+```bash
+docker pull tkojima0107/cw-ext-notebooks:normal-<release>
+docker tag tkojima0107/cw-ext-notebooks:normal-<release> cw-ext-notebooks:normal
+```
+Replace `<release>` with the desired release version.
 
 ## CUDA enabled image
 ```bash
 docker compose -f docker-compose.yml -f docker/docker-compose.override.nvidia.yml build
 ```
+Alternatively, you can use the pre-built image for the CUDA-enabled container instead of building it from source. To do so, run the following command:
+
+```bash
+docker pull tkojima0107/cw-ext-notebooks:nvidia-<release>
+docker tag tkojima0107/cw-ext-notebooks:nvidia-<release> cw-ext-notebooks:nvidia
+```
+Replace `<release>` with the desired release version.
 
 ## OpenCL enabled image for AMDGPU
 ```bash

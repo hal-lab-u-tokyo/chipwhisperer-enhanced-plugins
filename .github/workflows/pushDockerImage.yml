@@ -16,13 +16,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push standard image
+      - name: Build and push normal image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/Dockerfile-normal
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/cw-enhanced-plugins:standard-${{ github.event.release.tag_name }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/cw-ext-notebooks:normal-${{ github.event.release.tag_name }}
 
       - name: Build and CUDA image
         uses: docker/build-push-action@v5
@@ -30,4 +30,4 @@ jobs:
           context: .
           file: ./docker/Dockerfile-nvidia
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/cw-enhanced-plugins-cuda:cuda-${{ github.event.release.tag_name }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/cw-ext-notebooks:nvidia-${{ github.event.release.tag_name }}

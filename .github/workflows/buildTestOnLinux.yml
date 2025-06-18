@@ -1,4 +1,4 @@
-name: Build Verification for Linux
+name: Build & Test for Linux
 on:
   push:
     branches: [ master ]
@@ -7,6 +7,33 @@ on:
 
 jobs:
   build_test:
-    uses: ./.github/workflows/reusableBuildOnLinux.yml
-    with:
-      python_version: ["3.10.17", "3.11.12", "3.12.10"]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.10.17", "3.11.12", "3.12.10" ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ inputs.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip3 install pybind11
+          sudo apt-get update
+          sudo apt-get install cmake
+          git clone https://github.com/newaetech/chipwhisperer.git -b 5.7.0
+          cd chipwhisperer
+          pip3 install .
+
+      - name: Build
+        run:
+          pip3 install . -v
+
+      - name: Run tests
+        run: |
+          cd pytest && pytest -v

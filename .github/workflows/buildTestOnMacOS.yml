@@ -1,4 +1,4 @@
-name: Build Verification for macOS
+name: Build & Test for macOS
 on:
   push:
     branches: [ master ]
@@ -7,6 +7,25 @@ on:
 
 jobs:
   build_test:
-    uses: ./.github/workflows/reusableBuildOnMacOS.yml
-    with:
-      python_versions: '["3.10.17", "3.11.12", "3.12.10"]'
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: [ "3.12" ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ inputs.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Run install script
+        run: |
+          python -m pip install --upgrade pip
+          bash ./install_mac.sh
+
+      - name: Run tests
+        run: |
+          source ./venv/bin/activate
+          cd pytest && pytest -v

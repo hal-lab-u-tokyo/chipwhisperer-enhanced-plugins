@@ -1,5 +1,6 @@
 # Chipwhisperer-Enhanced-Plugins
-[![Build Verification](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/build.yml/badge.svg)](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/build.yml)
+[![Build & Test for Linux](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnLinux.yml/badge.svg)](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnLinux.yml)
+[![Build & Test for macOS](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnMacOS.yml/badge.svg)](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnMacOS.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Downloads](https://img.shields.io/github/downloads/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/total)
 

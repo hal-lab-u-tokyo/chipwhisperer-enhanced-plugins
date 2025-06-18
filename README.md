@@ -1,4 +1,9 @@
 # Chipwhisperer-Enhanced-Plugins
+[![Build Verification](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/build.yml/badge.svg)](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Downloads](https://img.shields.io/github/downloads/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/total)
+
+
 This repository provides enhanced plugins for the [Chipwhisperer](https://github.com/newaetech/chipwhisperer) framework, which is a popular platform for hardware security research. The plugins extend the capabilities of Chipwhisperer by providing support for various hardware platforms, capture devices, and analysis algorithms, as shown in the figure below.
 
 <img src="./docs/assets/images/overview.png" alt="Chipwhisperer Enhanced Plugins Overview" width="300">

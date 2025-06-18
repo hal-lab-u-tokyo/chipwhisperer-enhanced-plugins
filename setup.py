@@ -130,6 +130,7 @@ setup(
         "ipyfilechooser",
         "pyelftools",
         "nest_asyncio",
+        "h5py",
         "pytest"
     ],
 

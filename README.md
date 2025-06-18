@@ -1,9 +1,9 @@
 # Chipwhisperer-Enhanced-Plugins
-[![Build & Test for Linux](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnLinux.yml/badge.svg)](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnLinux.yml)
-[![Build & Test for macOS](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnMacOS.yml/badge.svg)](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnMacOS.yml)
+![latest release](https://img.shields.io/github/v/release/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins?include_prereleases)
+[![Build & Test for Linux](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnLinux.yml/badge.svg?branch=master)](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnLinux.yml)
+[![Build & Test for macOS](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnMacOS.yml/badge.svg?branch=master)](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/actions/workflows/buildTestOnMacOS.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Downloads](https://img.shields.io/github/downloads/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/total)
-
 
 This repository provides enhanced plugins for the [Chipwhisperer](https://github.com/newaetech/chipwhisperer) framework, which is a popular platform for hardware security research. The plugins extend the capabilities of Chipwhisperer by providing support for various hardware platforms, capture devices, and analysis algorithms, as shown in the figure below.
 

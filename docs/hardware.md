@@ -280,7 +280,7 @@ It has almost the same methods as `SakuraXVexRISCVControlBase` except for the `_
 A path to program binary file must be set to the `program` keyword argument for `cw.target` routine.
 
 
-## AES example
+## AES example on VexRiscv_SCA
 
 This repository includes software implementations of AES-128 encryption for VexRiscv.
 [`SakuraXVexRISCVAESExample`](../lib/cw_plugins/targets/SakuraXVexRISCVAESExample.py) is a derived class of `SakuraXShellBase`.

@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  01-02-2025 09:07:18
-#   Last Modified: 18-06-2025 10:52:26
+#   Last Modified: 20-06-2025 16:03:56
 ###
 
 from chipwhisperer.common.utils.parameter import setupSetParam
@@ -20,7 +20,7 @@ import numpy as np
 from .cpa_algorithms.models import get_c_model
 from .socpa_stats import SOCPAResults
 
-class SOCPAAlogrithm(AlgorithmsBase):
+class SOCPAAlgorithm(AlgorithmsBase):
     """
     Second Order CPA Attack
     """
@@ -51,6 +51,7 @@ class SOCPAAlogrithm(AlgorithmsBase):
 
     def set_point_tile_size(self, tile_size):
         self.point_tile_size = tile_size
+
 
     def set_trace_tile_size(self, tile_size):
         self.trace_tile_size = tile_size
@@ -109,7 +110,7 @@ class SOCPAAlogrithm(AlgorithmsBase):
         # del socpa
         del socpa
 
-class SOCPAAlogrithmCuda(SOCPAAlogrithm):
+class SOCPAAlgorithmCuda(SOCPAAlgorithm):
     """
     Second Order CPA Attack with CUDA
     """
@@ -119,7 +120,7 @@ class SOCPAAlogrithmCuda(SOCPAAlogrithm):
         from .cpa_algorithms.socpa_cuda_kernel import SOCPACuda
         return SOCPACuda(byte_len, numpoints, self._window_size, model, True)
 
-class SOCPAAlogrithmCudaNoSM(SOCPAAlogrithm):
+class SOCPAAlgorithmCudaNoSM(SOCPAAlgorithm):
     """
     Second Order CPA Attack with CUDA (No shared memory)
     """
@@ -129,7 +130,7 @@ class SOCPAAlogrithmCudaNoSM(SOCPAAlogrithm):
         from .cpa_algorithms.socpa_cuda_kernel import SOCPACuda
         return SOCPACuda(byte_len, numpoints, self._window_size, model, False)
 
-class SOCPAAlogrithmCudaFP32(SOCPAAlogrithm):
+class SOCPAAlgorithmCudaFP32(SOCPAAlgorithm):
     """
     Second Order CPA Attack with CUDA (FP32 emulation)
     """
@@ -139,7 +140,7 @@ class SOCPAAlogrithmCudaFP32(SOCPAAlogrithm):
         from .cpa_algorithms.socpa_cuda_kernel import SOCPACudaFP32
         return SOCPACudaFP32(byte_len, numpoints, self._window_size, model, True)
     
-class SOCPAAlogrithmCudaFP32NoSM(SOCPAAlogrithm):
+class SOCPAAlgorithmCudaFP32NoSM(SOCPAAlgorithm):
     """
     Second Order CPA Attack with CUDA (FP32 emulation, No shared memory)
     """
@@ -149,7 +150,7 @@ class SOCPAAlogrithmCudaFP32NoSM(SOCPAAlogrithm):
         from .cpa_algorithms.socpa_cuda_kernel import SOCPACudaFP32
         return SOCPACudaFP32(byte_len, numpoints, self._window_size, model, False)
 
-class SOCPAAlogrithmOpenCL(SOCPAAlogrithm):
+class SOCPAAlgorithmOpenCL(SOCPAAlgorithm):
     """
     Second Order CPA Attack with OpenCL
     """
@@ -159,7 +160,7 @@ class SOCPAAlogrithmOpenCL(SOCPAAlogrithm):
         from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCL
         return SOCPAOpenCL(byte_len, numpoints, self._window_size, model, True)
 
-class SOCPAAlogrithmOpenCLNoSM(SOCPAAlogrithm):
+class SOCPAAlgorithmOpenCLNoSM(SOCPAAlgorithm):
     """
     Second Order CPA Attack with OpenCL (No shared memory)
     """
@@ -169,7 +170,7 @@ class SOCPAAlogrithmOpenCLNoSM(SOCPAAlogrithm):
         from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCL
         return SOCPAOpenCL(byte_len, numpoints, self._window_size, model, False)
 
-class SOCPAAlogrithmOpenCLFP32(SOCPAAlogrithm):
+class SOCPAAlgorithmOpenCLFP32(SOCPAAlgorithm):
     """
     Second Order CPA Attack with OpenCL (FP32 emulation)
     """
@@ -179,7 +180,7 @@ class SOCPAAlogrithmOpenCLFP32(SOCPAAlogrithm):
         from .cpa_algorithms.socpa_opencl_kernel import SOCPAOpenCLFP32
         return SOCPAOpenCLFP32(byte_len, numpoints, self._window_size, model, True)
 
-class SOCPAAlogrithmOpenCLFP32NoSM(SOCPAAlogrithm):
+class SOCPAAlgorithmOpenCLFP32NoSM(SOCPAAlgorithm):
     """
     Second Order CPA Attack with OpenCL (FP32 emulation, No shared memory)
     """
@@ -192,7 +193,7 @@ class SOCPAAlogrithmOpenCLFP32NoSM(SOCPAAlogrithm):
 class SOCPA(AttackBaseClass):
     """Second Order CPA Attack"""
 
-    def __init__(self, proj, leak_model : ModelsBase, algorithm : SOCPAAlogrithm):
+    def __init__(self, proj, leak_model : ModelsBase, algorithm : SOCPAAlgorithm):
         self._analysisAlgorithm = algorithm()
         super().__init__()
         self.updateScript()
@@ -223,6 +224,9 @@ class SOCPA(AttackBaseClass):
         self.set_trace_start(start)
         self.set_trace_end(end)
 
+    trace_range = property(fset=lambda self, trange: self.set_trace_range(trange[0], trange[1]))
+
+    point_range = property(fset=lambda self, prange: self.set_point_range(prange))
 
     def get_trace_range(self):
         return (self.get_trace_start(), self.get_trace_end())

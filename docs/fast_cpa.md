@@ -185,15 +185,15 @@ The 2nd-order CPA acceleration library includes the following algorithms:
 | Algorithm  | Prerequisites  | Remarks |
 |------------|----------------|---------|
 | `SOCPAAlgorithm` | (OpenMP) | Accelerates the 2nd-order CPA process using multithreading if OpenMP is available. To increase cache efficiency, it uses tiling to process traces and points in chunks. |
-| `SOCPAAlogrithmCuda` | CUDA, double-precision support, 64bit atomicAdd | Leverages CUDA to accelerate the 2nd-order CPA process on NVIDIA GPUs. Optimized to utilize shared memory for improved performance.|
-| `SOCPAAlogrithmCudaFP32` | CUDA, 64bit atomicAdd | A variant of `SOCPAAlogrithmCuda` that uses single-precision floating-point arithmetic to emulate double-precision. Optimized for GPUs where single-precision performance significantly outpaces double-precision, such as GeForce series GPUs. Also optimized to utilize shared memory for improved performance. |
-| `SOCPAAlogrithmCudaNoSM` | CUDA, double-precision support | A variant of `SOCPAAlogrithmCuda` that does not use shared memory. |
-| `SOCPAAlogrithmCudaFP32NoSM` | CUDA | A variant of `SOCPAAlogrithmCudaFP32` that does not use shared memory. |
-| `SOCPAAlogrithmOpenCL` | OpenCL, double-precision support, 64-bit atom_cmpxchg | Uses OpenCL to accelerate the 2nd-order CPA process on GPUs. Optimized to utilize local memory for improved performance. Designed for compatibility with a wide range of devices, including AMD GPUs. |
-| `SOCPAAlogrithmOpenCLFP32` | OpenCL, 64-bit atom_cmpxchg | A variant of `SOCPAAlogrithmOpenCL` that uses single-precision floating-point arithmetic to emulate double-precision. Optimized to utilize local memory for improved performance. |
-| `SOCPAAlogrithmOpenCLNoSM` | OpenCL, double-precision support | A variant of `SOCPAAlogrithmOpenCL` that does not use local memory. |
-| `SOCPAAlogrithmOpenCLFP32NoSM` | OpenCL | A variant of `SOCPAAlogrithmOpenCLFP32` that does not use local memory. |
+| `SOCPAAlgorithmCuda` | CUDA, double-precision support, 64bit atomicAdd | Leverages CUDA to accelerate the 2nd-order CPA process on NVIDIA GPUs. Optimized to utilize shared memory for improved performance.|
+| `SOCPAAlgorithmCudaFP32` | CUDA, 64bit atomicAdd | A variant of `SOCPAAlgorithmCuda` that uses single-precision floating-point arithmetic to emulate double-precision. Optimized for GPUs where single-precision performance significantly outpaces double-precision, such as GeForce series GPUs. Also optimized to utilize shared memory for improved performance. |
+| `SOCPAAlgorithmCudaNoSM` | CUDA, double-precision support | A variant of `SOCPAAlgorithmCuda` that does not use shared memory. |
+| `SOCPAAlgorithmCudaFP32NoSM` | CUDA | A variant of `SOCPAAlgorithmCudaFP32` that does not use shared memory. |
+| `SOCPAAlgorithmOpenCL` | OpenCL, double-precision support, 64-bit atom_cmpxchg | Uses OpenCL to accelerate the 2nd-order CPA process on GPUs. Optimized to utilize local memory for improved performance. Designed for compatibility with a wide range of devices, including AMD GPUs. |
+| `SOCPAAlgorithmOpenCLFP32` | OpenCL, 64-bit atom_cmpxchg | A variant of `SOCPAAlgorithmOpenCL` that uses single-precision floating-point arithmetic to emulate double-precision. Optimized to utilize local memory for improved performance. |
+| `SOCPAAlgorithmOpenCLNoSM` | OpenCL, double-precision support | A variant of `SOCPAAlgorithmOpenCL` that does not use local memory. |
+| `SOCPAAlgorithmOpenCLFP32NoSM` | OpenCL | A variant of `SOCPAAlgorithmOpenCLFP32` that does not use local memory. |
 
-Apple Silicon GPUs lack support for 64-bit atomic operations, even for integer types. As a result, the only compatible algorithm for these GPUs is `SOCPAAlogrithmOpenCLFP32NoSM`.
+Apple Silicon GPUs lack support for 64-bit atomic operations, even for integer types. As a result, the only compatible algorithm for these GPUs is `SOCPAAlgorithmOpenCLFP32NoSM`.
 
-While Intel GPUs do support 64-bit atomic operations, their shared memory for all invoked threads is statically allocated within the kernel. This limitation generally results in insufficient shared memory, making `SOCPAAlogrithmOpenCLFP32NoSM` the sole viable algorithm for Intel GPUs as well.
+While Intel GPUs do support 64-bit atomic operations, their shared memory for all invoked threads is statically allocated within the kernel. This limitation generally results in insufficient shared memory, making `SOCPAAlgorithmOpenCLFP32NoSM` the sole viable algorithm for Intel GPUs as well.

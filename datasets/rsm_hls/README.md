@@ -1,4 +1,4 @@
-# RSM-RTL Dataset
+# RSM-HLS Dataset
 
 This dataset is obtained from HLS implementation of RSM masking scheme.
 

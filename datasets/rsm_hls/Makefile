@@ -5,7 +5,7 @@
 #    Project:       sca_toolbox
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  21-06-2025 06:35:27
-#    Last Modified: 21-06-2025 06:50:42
+#    Last Modified: 21-06-2025 07:29:55
 #
 
 ..PHONY: rsm_hls clean distclean
@@ -28,4 +28,4 @@ clean:
 
 distclean:
 	make -C rsm_hls_data/traces distclean
-	git reset --hard HEAD rsm_hls.cwp
+	git checkout HEAD rsm_hls.cwp

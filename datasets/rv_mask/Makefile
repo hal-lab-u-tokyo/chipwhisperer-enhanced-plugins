@@ -5,7 +5,7 @@
 #    Project:       sca_toolbox
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  21-06-2025 02:05:56
-#    Last Modified: 21-06-2025 03:15:23
+#    Last Modified: 21-06-2025 07:30:23
 #
 
 
@@ -42,4 +42,4 @@ clean:
 distclean:
 	make -C rv_mask_data/traces distclean
 	make -C rv_mask_small_data/traces distclean
-	git reset --hard HEAD rv_mask.cwp rv_mask_small.cwp
+	git checkout HEAD rv_mask.cwp rv_mask_small.cwp

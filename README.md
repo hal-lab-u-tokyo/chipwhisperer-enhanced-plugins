@@ -73,7 +73,13 @@ See the Setup Guide of [documentation](./docs/README.md) for instructions on how
 * [Tutorial 2: 2nd-order CPA on ASCAD dataset](./notebooks/tutorial_socpa.ipynb)
 
 ## Open Datasets
-We plan to release datasets generated using this framework, as described in the aforementioned paper, in the near future.
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15707560.svg)](https://doi.org/10.5281/zenodo.15707560)
+
+We provide several open datasets for benchmarking side-channel attacks.
+The datasets provided here were generated and evaluated as part of the research presented in our aforementioned paper.
+These datasets are specifically organized for research on non-profiling side-channel attacks. They feature traces corresponding to a fixed single key and exclude any masking values.
+
+See the [datasets directory](./datasets/README.md) for more details.
 
 ## Our Related Projects
 * [cw_ml_plugins](https://github.com/hal-lab-u-tokyo/cw_ml_plugin): A collection of machine learning based attack plugins for ChipWhisperer.

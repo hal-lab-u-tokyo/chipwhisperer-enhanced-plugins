@@ -1,0 +1,4 @@
+*.xz
+*.tar
+!*.cwp
+extracted_archive_marker

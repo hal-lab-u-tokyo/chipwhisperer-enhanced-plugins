@@ -16,17 +16,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push normal image
-        uses: docker/build-push-action@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
         with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build and push normal image
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64, linux/arm64
           context: .
           file: ./docker/Dockerfile-normal
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/cw-ext-notebooks:normal-${{ github.event.release.tag_name }}
 
       - name: Build and CUDA image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
+          platforms: linux/amd64
           context: .
           file: ./docker/Dockerfile-nvidia
           push: true

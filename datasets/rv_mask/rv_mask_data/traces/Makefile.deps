@@ -497,7 +497,7 @@ part_9_keylist.npy: part_9_keylist.npy.xz
 part_9_knownkey.npy: part_9_knownkey.npy.xz
 part_9_textin.npy: part_9_textin.npy.xz
 part_9_textout.npy: part_9_textout.npy.xz
-part_9_traces.npy: part_9_traces.npy.xz:
+part_9_traces.npy: part_9_traces.npy.xz
 
 part_0_keylist.npy.xz: extracted_archive_marker
 part_0_knownkey.npy.xz: extracted_archive_marker

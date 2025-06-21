@@ -20,7 +20,7 @@ Therefore, we also provide a small size version of the dataset, which is a subse
 - **Full size**
   - **Number of Traces**: 1,000,000 traces
   - **Number of Samples**: 11800 samples per trace (only for 1st round of AES)
--- **Small size**
+- **Small size**
   - **Number of Traces**: 150,000 traces
   - **Number of Samples**: 3000 samples per trace (\[3000:6000\] samples extracted from the full dataset)
 
@@ -75,3 +75,5 @@ The reported sample positions are relative to the 3000th sample in the waveform.
       14      0x4F    (1187,1808)     0.01939         0
       15      0x3C    (1026,1947)     0.02269         0
 ```
+
+**Note**: The attack was completed in 3681.78 seconds (about 1 hour) on a system featuring an Nvidia GeForce RTX 4090 GPU, a 64-core Ryzen Threadripper Pro 5995WX CPU, and 512 GB of RAM. (`SOCPAAlgorithmCudaFP32` was used for the attack.)

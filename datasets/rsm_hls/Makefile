@@ -5,13 +5,20 @@
 #    Project:       sca_toolbox
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  21-06-2025 06:35:27
-#    Last Modified: 21-06-2025 07:29:55
+#    Last Modified: 21-06-2025 12:20:56
 #
 
 ..PHONY: rsm_hls clean distclean
 
+JOBS := $(shell \
+  if command -v nproc > /dev/null; then \
+    nproc; \
+  else \
+    sysctl -n hw.ncpu; \
+  fi)
+
 rsm_hls:
-	$(MAKE) -C rsm_hls_data/traces -j `nproc`
+	$(MAKE) -C rsm_hls_data/traces -j $(JOBS)
 ifdef PART_SIZE
 ifeq ($(shell expr $(PART_SIZE) \<= 100), 1)
 	@echo "Disabling traces for parts larger than PART_SIZE=$(PART_SIZE)"

@@ -52,6 +52,39 @@ cd chipwhisperer-enhanced-plugins/pytest
 pytest -v
 ```
 
+# Installation on WSL
+To set up the framework and its prerequisites on WSL (Windows Subsystem for Linux), use the `setup_wsl_env.sh` script located in the root of this repository.
+
+This script is designed for a clean installation of Ubuntu 24.04 on WSL.
+Please be carefull when using it on existing WSL environments, as it may overwrite existing configurations.
+
+## Create a new WSL environment and log in to it
+If WSL is not installed, you can create a new WSL environment with Ubuntu 24.04 by running the following command in PowerShell:
+```Powershell
+wsl --install -d Ubuntu-24.04
+```
+After installation, you will automatically be logged into the new WSL environment. If you already have WSL installed, log in to the Ubuntu 24.04 environment using:
+```Powershell
+wsl -d Ubuntu-24.04
+```
+
+## Run the setup script
+Navigate to the repository directory or clone the repository inside the WSL environment, then execute the setup script:
+```bash
+# Replace with the actual path to the repository or clone this repo inside WSL
+cd <path to this repo>
+sudo bash ./setup_wsl_env.sh
+```
+The script accepts the following options:
+- `--venv-path path`: Specify the path to the virtual environment. Default to `/opt/cw-venv` if not provided.
+- `--enable-cuda`: Enable CUDA support. To customize the CUDA toolkit version, modify the `CUDA_TOOLKIT_VERSION` variable. Ensure WSL version 2 is used for GPU pass-through and that your Windows host has the NVIDIA driver installed.
+- `--enable-rocm`: Enable ROCm support. To customize the ROCm version, modify the `ROCM_VERSION` and `ROCM_VERSION_SHORT` variables. Verify that your AMD GPU is supported in the WSL environment according to the official documentation.
+
+> **Note**: Using both CUDA and ROCm simultaneously is not recommended.
+
+Related links:
+- [CUDA on WSL User Guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
+- [WSL support matrices by ROCm version](https://rocm.docs.amd.com/projects/radeon/en/latest/docs/compatibility/wsl/wsl_compatibility.html)
 
 # Steps to use VISA-compatible oscilloscopes
 Users who do not need to use VISA-compatible oscilloscopes to capture traces can skip this section.

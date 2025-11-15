@@ -5,7 +5,7 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  13-07-2024 16:20:31
-#   Last Modified: 27-02-2025 18:22:09
+#   Last Modified: 15-11-2025 15:23:18
 ###
 
 from .SakuraXShell import SakuraXShellControlBase
@@ -41,7 +41,7 @@ class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
         self.loadProgram(program)
 
         # use default address map
-        self.control_address = 0xC000_0000
+        self.control_address = 0x4000_0000
         self.memmap_core = MemoryMap()
         self.memmap_core.add_range("axi_buffer_0", 0xA200_0000, 0xA200_FFFF)
 

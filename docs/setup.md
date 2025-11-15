@@ -12,7 +12,7 @@ Currently, we tested this framework with Chipwhisperer 5.7.0.
 At least, the following commands are required to install Chipwhisperer and its Jupyter Notebook environment.
 
 ```
-git clone https://github.com/newaetech/chipwhisperer.git -b 5.7.0
+git clone --recursive https://github.com/newaetech/chipwhisperer.git -b 5.7.0
 cd chipwhisperer
 pip3 install .
 pip3 install -r jupyter/requirements.txt

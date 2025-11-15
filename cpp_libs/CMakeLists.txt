@@ -5,13 +5,13 @@
 #    Project:       tkojima
 #    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #    Created Date:  16-01-2024 21:01:52
-#    Last Modified: 30-04-2025 04:40:45
+#    Last Modified: 16-11-2025 07:37:38
 #
 
 cmake_minimum_required(VERSION 3.20)
 
 project(cw_enhanced_plugin_cpp_libs VERSION 0.1.0)
-set(Python_VIRTUALENV FIRST)
+set(Python_FIND_VIRTUALENV FIRST)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
 # add include directory globally

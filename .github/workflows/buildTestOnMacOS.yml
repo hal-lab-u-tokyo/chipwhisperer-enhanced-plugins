@@ -23,7 +23,7 @@ jobs:
       - name: Run install script
         run: |
           python -m pip install --upgrade pip
-          bash ./install_mac.sh
+          Python3_ROOT_DIR= bash ./install_mac.sh
 
       - name: Run tests
         run: |

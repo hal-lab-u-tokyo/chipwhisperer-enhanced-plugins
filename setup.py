@@ -84,6 +84,11 @@ def post_process(installed_path):
         shutil.copy(hwh_file, str(copy_dst) + "/" + name + ".hwh")
         print("Adding", hwh_file, "to", copy_dst)
 
+    Vexriscv_hwh_file = repo_path / "hardware" / "VexRiscv_SCA" / "bitstream" / "prebuilt_cw305.hwh"
+    if Vexriscv_hwh_file.exists():
+        shutil.copy(Vexriscv_hwh_file, str(copy_dst) + "/VexRiscv.hwh")
+        print("Adding", Vexriscv_hwh_file, "to", copy_dst)
+
     bit_files = glob.glob(str(cw305_shell / "**/*.bit"), recursive=True)
     copy_dst = installed_path / "targets" / "bitstreams" / "cw305"
     if not copy_dst.exists():
@@ -94,6 +99,11 @@ def post_process(installed_path):
         name = p.parent.stem
         shutil.copy(bit_file, str(copy_dst) + "/" + name + ".bit")
         print("Adding", bit_file, "to", copy_dst)
+
+    Vexriscv_bit_file = repo_path / "hardware" / "VexRiscv_SCA" / "bitstream" / "prebuilt_cw305.bit"
+    if Vexriscv_bit_file.exists():
+        shutil.copy(Vexriscv_bit_file, str(copy_dst) + "/VexRiscv.bit")
+        print("Adding", Vexriscv_bit_file, "to", copy_dst)
 
 
 class PostDevelopCommand(develop):

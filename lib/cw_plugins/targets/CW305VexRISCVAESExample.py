@@ -1,3 +1,5 @@
+from zipfile import Path
+
 from .CW305VexRISCV import CW305VexRISCVBase
 import os
 from Crypto.Cipher import AES
@@ -26,6 +28,16 @@ class CW305RISCVAES128bit(CW305VexRISCVBase):
         else:
             print("Unprotected AES program is selected")
             self.program = UNMASKED_PROGRAM
+
+        use_prebuilt_bitstream = False
+        name_base = "VexRiscv"
+        if "bsfile" not in kwargs:
+            kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / "cw305" / name_base).with_suffix(".bit")
+            use_prebuilt_bitstream = True
+
+        if "hwh_file" not in kwargs and use_prebuilt_bitstream:
+            kwargs["hwh_file"] = (Path(__file__).parent / "hwh_files" / "cw305" / name_base).with_suffix(".hwh")
+        
         super()._con(scope, program = self.program, **kwargs)
 
 

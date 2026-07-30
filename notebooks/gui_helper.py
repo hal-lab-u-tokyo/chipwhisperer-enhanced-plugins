@@ -432,14 +432,14 @@ class CapturePanel:
         self.draw_interval.disabled = False
         self.trace_count_input.disabled = False
         self.start_button.disabled = False
-        self.change_key_button.disabled = False
+        self.key_gen_button.disabled = False
 
     def deactivate_config_widgets(self):
         self.trace_count_input.disabled = True
         self.draw_interval.disabled = True
         self.trace_count_input.disabled = True
         self.start_button.disabled = True
-        self.change_key_button.disabled = True
+        self.key_gen_button.disabled = True
 
     def save_project(self):
         filename = self.save_dir_chooser.selected + "/" + self.project_name_input.value
@@ -465,7 +465,7 @@ class CapturePanel:
     def show_key(self):
         s = self.key.hex()
         formatted = " ".join(s[i:i+2] for i in range(0, len(s), 2))
-        self.key_label.value = f"Key a: {formatted}"
+        self.key_label.value = f"Target Key: {formatted}"
 
     def show(self):
         display(VBox([HBox([self.key_label, self.key_gen_button]), self.trace_count_input, self.draw_interval, self.start_button, self.progress_bar.container, self.plot_output, 
@@ -510,47 +510,4 @@ def showCapturePanel(scope, target):
     if capturePanel is None:
         capturePanel = CapturePanel(scope, target)
     capturePanel.show()        
-
-# class TqdmWidget(widget_int._BoundedInt):
-#     """
-#         A widget that wraps tqdm for use in Jupyter notebooks.
-
-#         Example:
-#         ```
-#         pbar = TqdmWidget(description='progress', max=100)
-#         pbar.display()
-#         for i in range(100):
-#             # Do something ...
-#             pbar.update(1)
-#         ```
-#     """
-#     def __init__(self, *args, **kwargs):
-#         desc = kwargs.pop('description', '')
-#         super().__init__(*args, **kwargs)
-#         total = self.max
-#         self.progress_bar = tqdm_notebook(total=total, display=False)
-#         self.progress_bar.set_description(desc)
-
-#     def update(self, value):
-#         self.progress_bar.update(value)
-#         self.value = self.progress_bar.n
-
-#     def display(self):
-#         display(self.progress_bar.container)
-
-
-# def get_waveform_pane(project : Project , tqdm : TqdmWidget, draw_interval=10, resample_rate=None):
-#     def draw(count):
-#         if draw_interval != 1 and count % draw_interval != 1:
-#             plt.show()
-#         else:
-#             if not resample_rate is None:
-#                 wavelen = len(project.waves[-1])
-#                 wave = project.waves[-1].resample(resample_rate * wavelen)
-#             else:
-#                 wave = project.waves[-1]
-#             plt.plot(wave)
-#             plt.show()
-
-#     return interactive_output(draw, {'count': tqdm})
 

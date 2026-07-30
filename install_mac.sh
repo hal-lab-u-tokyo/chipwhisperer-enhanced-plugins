@@ -90,7 +90,7 @@ echo "-- Cloning chipwhisperer."
 temp_dir_name=$(mktemp -d -t chipwhisperer-XXXXXXXXXX)
 git clone https://github.com/newaetech/chipwhisperer.git $temp_dir_name
 cd $temp_dir_name
-git checkout 5.7.0
+git checkout v6.0.0b
 git submodule update --init jupyter
 pip3 install .
 pip3 install -r jupyter/requirements.txt

@@ -1,7 +1,9 @@
 name: Build & Test for macOS
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
+      - "compat/**"
   pull_request:
     branches: [ master ]
 

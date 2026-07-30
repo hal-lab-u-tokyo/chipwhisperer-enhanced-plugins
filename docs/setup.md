@@ -8,11 +8,11 @@ Please refer to the [macOS Installation Guide](#installation-script-on-macos) se
 # Prerequisites for Linux
 This framework needs [Chipwhisperer](https://github.com/newaetech/chipwhisperer) as a core componet.
 Please install it first acording to the official documentation.
-Currently, we tested this framework with Chipwhisperer 5.7.0.
+Currently, we tested this framework with Chipwhisperer version 6.0.0.
 At least, the following commands are required to install Chipwhisperer and its Jupyter Notebook environment.
 
 ```
-git clone --recursive https://github.com/newaetech/chipwhisperer.git -b 5.7.0
+git clone --recursive https://github.com/newaetech/chipwhisperer.git -b v6.0.0b
 cd chipwhisperer
 pip3 install .
 pip3 install -r jupyter/requirements.txt

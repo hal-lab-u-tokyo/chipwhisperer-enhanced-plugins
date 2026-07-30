@@ -14,7 +14,12 @@ This repository provides enhanced plugins for the [Chipwhisperer](https://github
 
 Technical details of the plugins are also described in the following paper:
 
-Takuya Kojima, Masaki Morita, Hideki Takase, and Hiroshi Nakamura, "An Open-Source Framework for Efficient Side-Channel Analysis on Cryptographic Implementations", Cryptology ePrint Archive, Report 2025/1130 (a preprint version of the paper, https://eprint.iacr.org/2025/1130)
+```
+Takuya Kojima, Masaki Morita, Hideki Takase, and Hiroshi Nakamura, "An Open-Source Framework for Efficient Side-Channel Analysis on Cryptographic Implementations", IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems (TCAD). DOI: 10.1109/TCAD.2026.3654878. 
+```
+
+We hope that those who use this repository for their research will cite this paper in their publications.
+
 
 ## Extended features
 ### Supported hardware platforms
@@ -55,6 +60,11 @@ If you have already cloned the repository without the `--recursive` flag, you ca
 ```bash
 git submodule update --init --recursive
 ```
+
+## Versioning
+
+This project follows the version of ChipWhisperer for which compatibility has been verified.
+
 
 ## Directory structure
 * lib: python library source

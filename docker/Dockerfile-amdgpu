@@ -28,7 +28,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # pull chipwhisperer and install
 RUN cd /opt && git clone https://github.com/newaetech/chipwhisperer.git && \
-	cd chipwhisperer && git checkout 5.7.0 && \
+	cd chipwhisperer && git checkout v6.0.0b && \
 	git submodule update --init jupyter && \
 	pip3 install . && \
 	pip3 install -r jupyter/requirements.txt

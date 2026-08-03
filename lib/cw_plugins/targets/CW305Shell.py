@@ -1,17 +1,15 @@
 ###
 #   Copyright (C) 2025 The University of Tokyo
 #   
-#   File:          /lib/cw_plugins/targets/CW305Shell.py
+#   File:          /CW305Shell.py
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  22-01-2025 08:34:28
-#   Last Modified: 28-01-2025 08:20:17
+#   Last Modified: 03-08-2026 20:51:42
 ###
 
 from pathlib import Path
-import asyncio
-import nest_asyncio
-nest_asyncio.apply()
+import time
 
 from enum import Enum
 
@@ -121,18 +119,16 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
         flit |= (parity << 24)
         return flit
 
-    async def __wait_until_not_ready(self):
+    def __wait_until_not_ready(self):
         """Wait until the FPGA responds some value other than NOT_READY"""
-        try:
-            while True:
-                resp = super().fpga_read(0x0, 1)[0]
-                if resp != CW305ShellBase.RESPONSE_NOT_READY:
-                    return resp
-                await asyncio.sleep(0.01)
-        except asyncio.CancelledError:
-            return -1
-        except asyncio.TimeoutError:
-            return -1
+        deadline = time.monotonic() + self.timeout
+        while time.monotonic() < deadline:
+            resp = super().fpga_read(0x0, 1)[0]
+            if resp != CW305ShellBase.RESPONSE_NOT_READY:
+                return resp
+            time.sleep(0.01)
+
+        return -1 # timeout
 
 
     def fpga_write(self, addr, data):
@@ -175,7 +171,7 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
             binary = flit & 0xff
             super().fpga_write(addr, [binary])
 
-        resp = asyncio.run(asyncio.wait_for(self.__wait_until_not_ready(), timeout=self.timeout))
+        resp = self.__wait_until_not_ready()
         if resp != CW305ShellBase.RESPONSE_CMD_OK:
             if resp < 0:
                 msg = f"FPGA write timed out"
@@ -212,7 +208,7 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
             addr = flit >> 8
             data = flit & 0xff
             super().fpga_write(addr, [data])
-        resp = asyncio.run(asyncio.wait_for(self.__wait_until_not_ready(), timeout=self.timeout))
+        resp = self.__wait_until_not_ready()
         if resp != CW305ShellBase.RESPONSE_READY:
             if resp < 0:
                 msg = f"FPGA read timed out"
@@ -244,7 +240,7 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
         addr = reset_cmd_flit >> 8
         data = reset_cmd_flit & 0xff
         super().fpga_write(addr, [data])
-        resp = asyncio.run(asyncio.wait_for(self.__wait_until_not_ready(), timeout=self.timeout))
+        resp = self.__wait_until_not_ready()
         if resp != CW305ShellBase.RESPONSE_CMD_OK:
             if resp < 0:
                 msg = f"Soft reset timed out"

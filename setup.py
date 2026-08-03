@@ -139,7 +139,6 @@ setup(
         "numpy>=1.25.0",
         "ipyfilechooser",
         "pyelftools",
-        "nest_asyncio",
         "h5py",
         "pytest"
     ],

@@ -8,7 +8,7 @@ However, this can be slow for large datasets (i.e., many traces or many points p
 since it is fully implemented in Python and cannot leverage multi-threading or GPU acceleration.
 
 ```python
-import chipwhisper as cw
+import chipwhisperer as cw
 import chipwhisperer.analyzer as cwa
 from chipwhisperer.analyzer.attacks import cpa_algorithms
 

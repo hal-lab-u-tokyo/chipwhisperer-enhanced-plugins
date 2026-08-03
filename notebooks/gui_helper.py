@@ -482,7 +482,7 @@ class CapturePanel:
         draw_interval = self.draw_interval.value
 
         # activate progress bar
-        self.progress_bar.n = 0
+        self.progress_bar.reset()
 
         self.project = project.Project()
 

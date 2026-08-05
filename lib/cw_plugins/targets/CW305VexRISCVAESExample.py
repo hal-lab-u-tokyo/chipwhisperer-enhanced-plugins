@@ -1,4 +1,15 @@
-from zipfile import Path
+###
+#   Copyright (C) 2026 The University of Tokyo
+#   
+#   File:          /CW305VexRISCVAESExample.py
+#   Project:       targets
+#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+#   Created Date:  05-08-2026 09:58:23
+#   Last Modified: 05-08-2026 09:58:27
+###
+
+
+from pathlib import Path
 
 from .CW305VexRISCV import CW305VexRISCVBase
 import os

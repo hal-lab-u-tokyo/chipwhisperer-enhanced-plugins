@@ -304,12 +304,12 @@ target = cw.target(scope, SakuraXVexRISCVAESExample, serial_port="/dev/ttyUSB0",
 
 ### Target specific options for CW305
 
-For CW305 board, `CW305RISCVAES128bit` is avaialble as follows:
+For CW305 board, `CW305VexRISCVAESExample` is avaialble as follows:
 ```python
 import chipwhisperer as cw
-from cw_plugins.targets import CW305RISCVAES128bit
+from cw_plugins.targets import CW305VexRISCVAESExample
 scope = cw.scope()  # or Visa oscilloscope
-target = cw.target(scope, CW305RISCVAES128bit, bsfile="path/to/bitstream_file", masked=True)
+target = cw.target(scope, CW305VexRISCVAESExample, bsfile="path/to/bitstream_file", masked=True)
 ```
 
 For both SAKURA-X and CW305, the program binary file contained in this repository is loaded,

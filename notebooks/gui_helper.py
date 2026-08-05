@@ -336,7 +336,7 @@ def connectBoard(scope):
             target = cw.target(scope, CW305ShellExampleAES128BitHLS, **kwargs)
         elif boardPanel.target_sel.value == "AES VexRiscV":
             kwargs['masked'] = boardPanel.soft_masking.value
-            target = cw.target(scope, CW305RISCVAES128bit, **kwargs)
+            target = cw.target(scope, CW305VexRISCVAESExample, **kwargs)
 
     if target is None:
         raise Exception("Failed to connect to the target. Please check the board settings and try again.")

@@ -9,7 +9,7 @@ Therefore, we also provide a small size version of the dataset, which is a subse
 - **Target**:  32-bit RISC-V processor with AES-128 implementation
   - **Board**: CW305
   - **Hardware Design**: [VexRiscv_SCA](https://github.com/hal-lab-u-tokyo/VexRiscv_SCA)
-  - **Python Target Class**: `CW305RISCVAES128bit` (See Also [API Usage example](../../docs/hardware.md#aes-example-on-vexriscv_sca))
+  - **Python Target Class**: `CW305VexRISCVAESExample` (See Also [API Usage example](../../docs/hardware.md#aes-example-on-vexriscv_sca))
   - **Masking Scheme**: Boolean masking
   - **Software code**: [aes_soft](../../lib//cw_plugins/targets/aes_soft)
   - **C Compiler**: clang 19.1.7

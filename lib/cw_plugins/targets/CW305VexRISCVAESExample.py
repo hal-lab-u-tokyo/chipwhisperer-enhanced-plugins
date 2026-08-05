@@ -5,7 +5,7 @@
 #   Project:       targets
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  05-08-2026 09:58:23
-#   Last Modified: 05-08-2026 09:58:27
+#   Last Modified: 05-08-2026 10:07:25
 ###
 
 
@@ -19,7 +19,7 @@ import numpy as np
 UNMASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/cw305/aes_unmasked.elf")
 MASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/cw305/aes_masked.elf")
 
-class CW305RISCVAES128bit(CW305VexRISCVBase):
+class CW305VexRISCVAESExample(CW305VexRISCVBase):
     CMD_SET_KEY 		= 0x11
     CMD_SET_PLAINTEXT	= 0x12
     CMD_ENCRYPT			= 0x13

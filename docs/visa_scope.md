@@ -5,21 +5,120 @@ We have developed a base class to enable VISA-compatible oscilloscopes to integr
 ### Current Limitations
 At present, the implementation does not support batch acquisition, meaning it cannot store multiple traces on the oscilloscope memory in a single call to minimize the number of VISA calls. This is a known limitation, and we plan to address it in future updates.
 
+# Connecting to VISA-compatible Oscilloscopes
+To connect to a VISA-compatible oscilloscope, you can use the `cw_plugins.scopes.Oscilloscope` method.
+This method is a factory function that automatically detects the vendor and model of the connected oscilloscope, determines the appropriate implementation class, and returns an instance of that class.
+If the connected oscilloscope is not supported, it raises a `ValueError` with a message indicating that the oscilloscope is not supported.
+
+```Python
+from cw_plugins.scopes import Oscilloscope
+visaAddress = "USB::...." # replace with the actual VISA address of your oscilloscope
+scope = Oscilloscope(visaAddress)
+```
+
+To find the VISA address of your oscilloscope, you can use the `pyvisa-shell` command-line tool. 
+
+```bash
+$ pyvisa-shell
+(visa) list
+# shown VISA addresses of connected instruments here
+```
+
+# Oscilloscope control API
+
+## `get_num_channels()`
+### Description
+Returns the number of channels available on the oscilloscope.
+### Args
+None
+### Returns
+  - Int: The number of channels available on the oscilloscope.
+
+## `get_sampling_rate()`
+### Description
+Returns the current sampling rate of the oscilloscope.
+### Args
+None
+### Returns
+  - float: The current sampling rate of the oscilloscope.
+
+## `set_sampling_rate(rate)`
+### Description
+Sets the sampling rate of the oscilloscope to the specified value.
+### Args
+- `rate` (float): The desired sampling rate to set on the oscilloscope
+### Returns
+- None
+### Raises
+- ValueError if the specified rate is out of the supported range for the oscilloscope.
+- RuntimeError if the oscilloscope fails to set the sampling rate. For example, if the specified rate is not supported by the oscilloscope, it may return an error.
+
+## `config_trace_channel(channel, scale, offset, period, delay = 0, ...)`
+### Description
+Configures the specified channel as the trace channel with the given vertical scale, offset, and other optional parameters.
+### Args
+- `channel` (int): The channel number to configure as the trace channel.
+- `scale` (float): The vertical scale for the trace channel (V/div).
+- `offset` (float): The vertical offset for the trace channel.
+- `period` (float): acquired waveform period in seconds.
+- `delay` (float): The delay in seconds to start the trace acquisition after the trigger.
+- `...`: Additional oscilloscope-specific parameters for configuring the trace channel.
+### Returns
+None
+### Raises
+- ValueError if the specified channel is invalid or out of range for the oscilloscope.
+
+## `config_trigger_channel(mode, channel, scale, offset)`
+### Description
+Configures the specified channel as the trigger channel with the given trigger mode, vertical scale, and offset.
+### Args
+- `mode` (str): trigger mode for the trace channel.
+    - `TriggerMode.EDGE_RISE`: Rising edge trigger
+    - `TriggerMode.EDGE_FALL`: Falling edge trigger
+    - `TriggerMode.EDGE_ANY`: Either rising or falling edge trigger
+- `channel` (int): The channel number to configure as the trigger channel.
+- `scale` (float): The vertical scale for the trigger channel (V/div).
+- `offset` (float): The vertical offset for the trigger channel.
+### Returns
+None
+### Raises
+- ValueError if the specified channel is invalid or out of range for the oscilloscope.
+
+## `is_triggered()`
+### Description
+Checks if the oscilloscope is currently triggered.
+### Args
+None
+### Returns
+- bool: True if the oscilloscope is triggered, False otherwise.
+
+## `arm()`
+### Description
+Starts the oscilloscope to wait for a trigger event.
+### Args
+None
+### Returns
+None
+
+## `get_last_trace(as_int)`
+### Description
+Retrieves the last captured trace from the oscilloscope.
+### Args
+- `as_int` (bool): If True, the trace is returned as an integer array; otherwise, it is returned as a floating-point array (if possible).
+### Returns
+- numpy.ndarray: The last captured trace from the oscilloscope, either as an integer array or a floating-point array, depending on the `as_int` argument.
+
+If some error occurs during the VISA communication, it returns `None`.
+
+
 # Extending Support for Specific Devices
 The provided base class is an abstract class, requiring you to create a subclass tailored to your specific VISA-compatible oscilloscope. To open your oscilloscope with `cw_plugins.scopes.Oscilloscope`, additional steps are necessary to enable detection and integration of your device.
 
 ## step 1: Implement a subclass to use bender specific VISA commands
-The abstract methods are listed below.
+The abstract methods are the above oscilloscope control API.
+You need to implement these methods using the VISA commands specific to your oscilloscope model.
 The implementation examples can be found in the `lib/cw_plugins/scopes` directory.
 
-- `get_num_channels()`: Returns the number of channels available on the oscilloscope.
-- `get_sampling_rate()`: Returns the current sampling rate of the oscilloscope.
-- `set_sampling_rate(rate)`: Sets the sampling rate of the oscilloscope to the specified value.
-- `config_trace_channel(mode, channel, scale, offset, delay = 0)`: Configures the specified channel  as power trace channel with the given vertical scale and offset. As an optional argument, you can specify the delay in seconds to start the trace acquisition after the trigger.
-- `config_trigger_channel(mode, channel, scale, offset)`: Configures the specified channel as trigger channel with the given trigger mode, vertical scale and offset.
-- `is_triggered()`: Checks if the oscilloscope is currently triggered.
-- `arm()`: Starts the oscilloscope to wait for a trigger event.
-- `get_last_trace(as_int)`: Retrieves the last captured trace from the oscilloscope. If `as_int` is `True`, the trace is returned as an integer array; otherwise, it is returned as a floating-point array (if possible).
 
 ## step 2: Register your subclass
 

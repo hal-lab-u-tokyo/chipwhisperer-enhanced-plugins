@@ -127,7 +127,7 @@ This is a pure Python implementation of the VISA interface, which can be used as
 pip3 install pyvisa-py
 ```
 
-## Installing udev rules
+## Installing udev rules (Linux only)
 Please copy the rules file from this repository or modify it to match the device you are using. 'lsusb' command is useful for checking the Vendor ID and Product ID.
 
 ```

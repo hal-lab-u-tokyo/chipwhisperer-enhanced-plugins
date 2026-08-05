@@ -59,6 +59,9 @@ However, some CPU architectures, such as Apple Silicon CPUs, do not support the 
 In such cases, we utilize a quad-precision floating-point emulation technique to ensure compatibility.
 It is automatically applied when building the library on such architectures with cmake.
 
+### CUDA device selection
+If you have multiple CUDA devices, you can specify the device to use by setting the `CUDA_VISIBLE_DEVICES` environment variable.
+
 ### OpenCL device selection
 If you have multiple OpenCL devices, you can specify the device to use by setting the `CL_PLATFORM` and `CL_DEVICE` environment variables.
 

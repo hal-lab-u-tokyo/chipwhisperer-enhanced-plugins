@@ -36,6 +36,7 @@ We hope that those who use this repository for their research will cite this pap
 * VISA compatible oscilloscopes
   * Keysight Infiniviion 40000 (MSO-X 4101A tested)
   * Rigol MSO8000 (MSO8104 tested)
+  
 You can integrate your own VISA-compatible oscilloscopes by creating a custom class that inherits from the provided base class.
 
 ### Analysis algorithms

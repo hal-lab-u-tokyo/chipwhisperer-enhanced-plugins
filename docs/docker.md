@@ -64,7 +64,7 @@ sh launch_docker.sh [TYPE] [--as-root]
 ```
 The `TYPE` argument can be one of the following:
 * `cpu`: OpenMP enabled container (default)
-* `cuda`: CUDA enabled container
+* `nvidia`: CUDA enabled container
 * `amdgpu`: OpenCL enabled container for AMDGPU
 * `intel-gpu`: OpenCL enabled container for Intel GPU
 

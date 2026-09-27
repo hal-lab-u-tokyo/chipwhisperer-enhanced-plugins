@@ -1,6 +1,6 @@
-FROM nvidia/cuda:12.8.1-devel-ubuntu24.04
+FROM nvidia/cuda:13.3.1-devel-ubuntu24.04
 
-LABEL maintener="Takuya Kojima <tkojima@hal.ipc.i.u-tokyo.ac.jp>"
+LABEL maintener="Takuya Kojima <tkojima@lila.cs.tsukuba.ac.jp>"
 
 ENV JUPYTER_PORT=8888
 ENV NOTEBOOK_TOKEN=chipwhisperer

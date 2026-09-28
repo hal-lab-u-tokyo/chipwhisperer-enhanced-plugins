@@ -11,7 +11,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(cw_enhanced_plugin_cpp_libs VERSION 0.1.0)
-set(Python_FIND_VIRTUALENV FIRST)
+set(Python3_FIND_VIRTUALENV FIRST)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
 # add include directory globally
@@ -25,6 +25,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 # find the pybind11 package for giving hints
+if (NOT pybind11_DIR)
 execute_process(
   COMMAND
 	${Python3_EXECUTABLE}  -c "import os; import pybind11; print(os.path.dirname(pybind11.__file__))"
@@ -39,6 +40,7 @@ if (NOT PYBIND11_SITE_PACKAGES)
 	else()
 		message(FATAL_ERROR "pybind11 not found. Please set PYBIND11_SITE_PACKAGES.")
 	endif()
+endif()
 endif()
 
 find_package(pybind11 REQUIRED HINTS ${PYBIND11_SITE_PACKAGES})

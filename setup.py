@@ -1,125 +1,115 @@
 from setuptools import setup, find_packages, Extension
 import subprocess
 import os
-from setuptools.command.develop import develop
-from setuptools.command.install import install
+from setuptools.command.build_py import build_py
 from setuptools.command.build_ext import build_ext
 
 from pathlib import Path
-import glob
 import shutil
 
 import_name = "cw_plugins"
 
 
-class CMakeExtension(Extension):
-    def __init__(self, name, cmake_src_dir):
-        super().__init__(name, sources=[])
-        self.cmake_src_dir = os.path.abspath(cmake_src_dir)
-
 class CMakeBuild(build_ext):
-
-    def __init__(self, *args):
-        super().__init__(*args)
+    """Build all CMake targets once, including during PEP 660 installs."""
 
     def run(self):
-        # check if build directory exists
-        if not os.path.exists(self.build_temp):
-            os.makedirs(self.build_temp)
+        import sys
+        import pybind11
 
-        abs_build_lib = os.path.abspath(self.build_lib)
-
+        # get_ext_fullpath respects both package_dir and inplace/editable mode.
+        output_dir = Path(self.get_ext_fullpath(self.extensions[0].name)).resolve().parent
+        build_dir = Path(self.build_temp).resolve()
+        build_dir.mkdir(parents=True, exist_ok=True)
+        cmake = "cmake3" if shutil.which("cmake3") else "cmake"
+        subprocess.check_call([
+            cmake, str(Path(__file__).resolve().parent / "cpp_libs"),
+            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir.parent}",
+            f"-DPython3_EXECUTABLE={sys.executable}",
+            f"-Dpybind11_DIR={pybind11.get_cmake_dir()}",
+        ], cwd=build_dir)
+        subprocess.check_call([
+            cmake, "--build", ".", "--parallel",
+            os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL", str(os.cpu_count() or 1)),
+        ], cwd=build_dir)
         for ext in self.extensions:
+            if not ext.optional and not Path(self.get_ext_fullpath(ext.name)).is_file():
+                raise RuntimeError(f"CMake did not produce {ext.name}")
 
-            cmake_args = [f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={abs_build_lib}{os.sep}{ext.name}']
+    def _built_extensions(self):
+        # GPU targets are optional and depend on the available toolkits.
+        return [ext for ext in self.extensions
+                if not ext.optional or Path(self.get_ext_fullpath(ext.name)).is_file()]
 
-            build_dir = f"{self.build_temp}{os.sep}{ext.name}"
-            os.makedirs(build_dir, exist_ok=True)
-            CMAKE_CMD = "cmake3" if shutil.which("cmake3") else "cmake"
-            # configure
-            try:
-                subprocess.check_call([CMAKE_CMD, ext.cmake_src_dir] + cmake_args, cwd=build_dir)
-            except subprocess.CalledProcessError as e:
-                print("CMake configuration failed")
-                print(e)
-                return
-            # build
-            subprocess.check_call([CMAKE_CMD, '--build', '.', '-j', f"{os.cpu_count()}"], cwd=build_dir)
+    def get_outputs(self):
+        return [str(Path(self.build_lib) / self.get_ext_filename(ext.name))
+                for ext in self._built_extensions()]
 
-        if self.inplace:
-            self.copy_tree(self.build_lib, f"lib")
+    def get_output_mapping(self):
+        if not self.inplace:
+            return {}
+        return {str(Path(self.build_lib) / self.get_ext_filename(ext.name)):
+                self.get_ext_fullpath(ext.name)
+                for ext in self._built_extensions()}
 
 
+module_prefix = "cw_plugins.analyzer.attacks.cpa_algorithms"
 ext_modules = [
-    CMakeExtension(f"{import_name}{os.sep}analyzer{os.sep}attacks", 'cpp_libs')
+    Extension(f"{module_prefix}.{name}", sources=[], optional=optional)
+    for name, optional in [
+        ("model_kernel", False), ("cpa_kernel", False), ("socpa_kernel", False),
+        ("cpa_cuda_kernel", True), ("socpa_cuda_kernel", True),
+        ("cpa_opencl_kernel", True), ("socpa_opencl_kernel", True),
+    ]
 ]
 
-def post_process(installed_path):
-    print("Search for hwh files of example designs")
-    # find hwh files for pre-built targets
-    repo_path = Path(__file__).parent
 
-    sakura_x_shell = repo_path / "hardware" / "sakura-x-shell" / "examples"
-    hwh_files = glob.glob(str(sakura_x_shell / "**/*.hwh"), recursive=True)
-    copy_dst = installed_path / "targets" / "hwh_files" / "sakura-x"
-
-    if not copy_dst.exists():
-        print("create directory", copy_dst)
-        copy_dst.mkdir(parents=True)
-    for hwh_file in hwh_files:
-        p = Path(hwh_file)
-        name = p.parent.stem
-        shutil.copy(hwh_file, str(copy_dst) + "/" + name + ".hwh")
-        print("Adding", hwh_file, "to", copy_dst)
-
-    cw305_shell = repo_path / "hardware" / "cw305-shell" / "examples"
-    hwh_files = glob.glob(str(cw305_shell / "**/*.hwh"), recursive=True)
-    copy_dst = installed_path / "targets" / "hwh_files" / "cw305"
-    if not copy_dst.exists():
-        print("create directory", copy_dst)
-        copy_dst.mkdir(parents=True)
-    for hwh_file in hwh_files:
-        p = Path(hwh_file)
-        name = p.parent.stem
-        shutil.copy(hwh_file, str(copy_dst) + "/" + name + ".hwh")
-        print("Adding", hwh_file, "to", copy_dst)
-
-    Vexriscv_hwh_file = repo_path / "hardware" / "VexRiscv_SCA" / "bitstream" / "prebuilt_cw305.hwh"
-    if Vexriscv_hwh_file.exists():
-        shutil.copy(Vexriscv_hwh_file, str(copy_dst) + "/VexRiscv.hwh")
-        print("Adding", Vexriscv_hwh_file, "to", copy_dst)
-
-    bit_files = glob.glob(str(cw305_shell / "**/*.bit"), recursive=True)
-    copy_dst = installed_path / "targets" / "bitstreams" / "cw305"
-    if not copy_dst.exists():
-        print("create directory", copy_dst)
-        copy_dst.mkdir(parents=True)
-    for bit_file in bit_files:
-        p = Path(bit_file)
-        name = p.parent.stem
-        shutil.copy(bit_file, str(copy_dst) + "/" + name + ".bit")
-        print("Adding", bit_file, "to", copy_dst)
-
-    Vexriscv_bit_file = repo_path / "hardware" / "VexRiscv_SCA" / "bitstream" / "prebuilt_cw305.bit"
-    if Vexriscv_bit_file.exists():
-        shutil.copy(Vexriscv_bit_file, str(copy_dst) + "/VexRiscv.bit")
-        print("Adding", Vexriscv_bit_file, "to", copy_dst)
+def hardware_files():
+    """Map package-relative destinations to available hardware artifacts."""
+    root = Path(__file__).resolve().parent / "hardware"
+    files = {}
+    for board in ("sakura-x", "cw305"):
+        examples = root / f"{board}-shell" / "examples"
+        for source in examples.rglob("*.hwh"):
+            files[Path("targets/hwh_files") / board / f"{source.parent.stem}.hwh"] = source
+        if board == "cw305":
+            for source in examples.rglob("*.bit"):
+                files[Path("targets/bitstreams/cw305") / f"{source.parent.stem}.bit"] = source
+    for suffix, directory in (("hwh", "hwh_files"), ("bit", "bitstreams")):
+        source = root / "VexRiscv_SCA/bitstream" / f"prebuilt_cw305.{suffix}"
+        if source.is_file():
+            files[Path("targets") / directory / "cw305" / f"VexRiscv.{suffix}"] = source
+    return files
 
 
-class PostDevelopCommand(develop):
-    """Post-installation for development mode."""
+class BuildPy(build_py):
+    """Include hardware data in wheels and beside sources for editable installs."""
+
     def run(self):
-        develop.run(self)
-        installed_path = Path(self.install_lib) / import_name
-        post_process(installed_path)
+        super().run()
+        destination = (Path(self.get_package_dir(import_name)) if self.editable_mode
+                       else Path(self.build_lib) / import_name)
+        for relative, source in hardware_files().items():
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
 
+    def get_outputs(self, include_bytecode=1):
+        return list(dict.fromkeys(super().get_outputs(include_bytecode) + [
+            str(Path(self.build_lib) / import_name / relative)
+            for relative in hardware_files()
+        ]))
 
-class PostInstallCommand(install):
-    """Post-installation for installation mode."""
-    def run(self):
-        install.run(self)
-        installed_path = Path(self.install_lib) / import_name
-        post_process(installed_path)
+    def get_output_mapping(self):
+        mapping = super().get_output_mapping()
+        if self.editable_mode:
+            mapping.update({
+                str(Path(self.build_lib) / import_name / relative):
+                str(Path(self.get_package_dir(import_name)) / relative)
+                for relative in hardware_files()
+            })
+        return mapping
+
 
 setup(
     name=f'{import_name}',
@@ -147,7 +137,7 @@ setup(
     package_dir={'': 'lib'},
     include_package_data=True,
 
-    cmdclass={"build_ext": CMakeBuild, "develop": PostDevelopCommand, "install": PostInstallCommand},
+    cmdclass={"build_ext": CMakeBuild, "build_py": BuildPy},
     ext_modules=ext_modules,
 
     scripts=[]

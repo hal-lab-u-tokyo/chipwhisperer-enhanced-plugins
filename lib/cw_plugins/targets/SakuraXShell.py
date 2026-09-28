@@ -1,12 +1,13 @@
 ###
-#   Copyright (C) 2024 The University of Tokyo
+#   Copyright (C) 2026 University of Tsukuba
 #   
 #   File:          /lib/cw_plugins/targets/SakuraXShell.py
-#   Project:       sca_toolbox
-#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+#   Project:       chipwhisperer-enhanced-plugins
+#   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  27-03-2024 18:15:49
-#   Last Modified: 27-09-2026 20:05:03
+#   Last Modified: 28-09-2026 10:58:45
 ###
+
 
 from chipwhisperer.capture.targets._base import TargetTemplate
 import serial
@@ -273,7 +274,7 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
 
         return board.name, str(board / 'data'), str(board / 'reset')
 
-    def _con(self, scope, serial_number = None, data_port = None, reset_port = None, baud = 115200, *, serial_port = None, **kwargs):
+    def _con(self, scope, serial_number = None, data_port = None, reset_port = None, serial_port = None, **kwargs):
         """
         Auto detection and serial number selection work only on Linux with udev rules installed.
         For macOS and Windows, specify both data_port and reset_port. 
@@ -296,7 +297,7 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
             raise ValueError('data_port and reset_port must be different ports')
         try:
             # Set RTS inactive before open; True asserts the active-low RTS# pin.
-            self.reset_ser = serial.Serial(port=None, baudrate=baud, timeout=1,
+            self.reset_ser = serial.Serial(port=None, timeout=1,
                                            rtscts=False, dsrdtr=False)
             self.reset_ser.rts = False
             self.reset_ser.dtr = False
@@ -304,7 +305,7 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
             self.reset_ser.open()
             # Allow recovery if the OS/driver briefly asserted RTS during open.
             time.sleep(1)
-            self.ser = serial.Serial(data_port, baud, timeout=1, write_timeout=1)
+            self.ser = serial.Serial(data_port, timeout=1, write_timeout=1)
             self.scope = scope
             self._control_kwargs = dict(kwargs)
             self.ctrl = self.getControl(**kwargs)

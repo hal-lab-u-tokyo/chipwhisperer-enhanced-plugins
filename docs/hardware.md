@@ -10,9 +10,6 @@ The plugins support the following target hardware for acquiring traces and contr
 All of the target hardware can be controlled with their corresponding target classes, which are derived from `TargetTemplate` in Chipwhisperer.
 Therefore, it can be used in the same manner as the built-in target classes in Chipwhisperer like `cw.target`.
 
-<!-- [sample notebook](../notebooks/acquire_traces.ipynb) is available for acquiring traces from the target devices.
-
-You can find a code snnipet for the target hardware implementation at the end of this document. -->
 
 # SAKURA-X/SASEBO-GIII sample design
 If the SAKURA-X board is configured with a sample AES design distributed by AIST [here](https://www.risec.aist.go.jp/project/sasebo/),
@@ -27,7 +24,6 @@ from cw_plugins.targets import SakuraX
 scope = cw.scope() # or Visa oscilloscope
 target = cw.target(scope, SakuraX, serial_port="/dev/ttyUSB0") # modify the serial port as needed
 ```
-Baud rate is defaulted to 115200, but you can change it by setting `baud` keyword argument.
 
 # [ESP32_AES128](../hardware/ESP32_AES128/)
 
@@ -62,6 +58,10 @@ For more information, please refer to its [repo](https://github.com/hal-lab-u-to
 
 This repository provides a driver template.
 
+## Initial board setup
+Before using the SAKURA-X Shell, please configure the Spartan-6 FPGA with the provided bitstream or your own bitstream.
+Detailed setup instructions are available in the [sakura-x-shell repository](https://github.com/hal-lab-u-tokyo/sakura-x-shell).
+
 ## [SakuraXShellBase](../lib/cw_plugins/targets/SakuraXShell.py)
 This is an abstract class for Sakura-X Shell derived from `TargetTemplate` in Chipwhisperer.
 If the following methods are implemented, the target can be used with `Chipwhisperer.capture_trace`.
@@ -71,6 +71,28 @@ If the following methods are implemented, the target can be used with `Chipwhisp
 * `getExpected(self) -> bytes`: return the expected ciphertext.
 * `loadEncryptionKey(self, key : bytes)`: set the encryption key.
 * `loadInput(self, inputtext: bytes)`: load the plaintext.
+
+### Connection and hardware reset
+
+Connection arguments passed to `cw.target` (internally calling `SakuraXShellBase._con`) are `serial_number=None`, `data_port=None`, `reset_port=None`.
+On Linux, discovery searches `/dev/sakura-x-shell/<serial>/` for valid `data`
+and `reset` links created by the [udev rules](setup.md#installing-udev-rules-linux-only).
+When multiple boards are connected, `serial_number` is necessary to select the intended board. If only one board is connected, it is optional.
+On other systems (e.g., Windows, macOS), auto detection and `serial_number` based discovery are not available, so both `data_port` and `reset_port` must be specified explicitly.
+
+
+```python
+# One connected board: automatic selection
+target = cw.target(scope, SakuraXShellExampleAES128BitRTL)
+# Or select a board (replace the example serial with your board's serial)
+target = cw.target(scope, SakuraXShellExampleAES128BitRTL, serial_number="FT7A1234")
+# Or provide both ports explicitly, including on Windows/macOS with VCP support
+target = cw.target(scope, SakuraXShellExampleAES128BitRTL,
+                   data_port="/dev/ttyUSB0", reset_port="/dev/ttyUSB1")
+```
+
+`target.hard_reset()` asserts Channel B RTS# low, which resets the controller state machine, buffers, and the target hardware (Kintex-7 FPGA). 
+If the contoller is not responding, the hard reset possibly recovers the controller and target hardware.
 
 ## [SakuraXShellControlBase](../lib/cw_plugins/targets/SakuraXShell.py)
 This is also an abstract class.
@@ -141,13 +163,13 @@ The pin 1 of CN8 is used for the trigger signal, similar to SASEBO-GIII sample.
 There are three versions of the RTL implementation, one is AIST implementation, Google ProjectVault implementation, and RSM masking implementation.
 
 To specify the implementation, please set `implmentation="aist"`, `implmentation="google"` or `implmentation="rsm"` keyword argument to the `con` method or `cw.target` routine.
-The serial port connected to USB interface of the SAKURA-X board must be set to `serial_port` keyword argument.
+With the updated EEPROM and udev rules, a single SAKURA-X Shell is detected automatically. If multiple boards are connected, specify `serial_number`.
 
 ```python
 import chipwhisperer as cw
 from cw_plugins.targets import SakuraXShellExampleAES128BitRTL
 scope = cw.scope()  # or Visa oscilloscope
-target = cw.target(scope, SakuraXShellExampleAES128BitRTL,  serial_port="/dev/ttyUSB0", implementation="aist")
+target = cw.target(scope, SakuraXShellExampleAES128BitRTL,  serial_number="FT7A1234", implementation="aist")
 ```
 
 The library loads a default hardware handoff file included in the repository.
@@ -166,7 +188,7 @@ In similar way to the RTL implementation, please set `implmentation="naive"` or 
 import chipwhisperer as cw
 from cw_plugins.targets import SakuraXShellExampleAES128BitHLS
 scope = cw.scope()  # or Visa oscilloscope
-target = cw.target(scope, SakuraXShellExampleAES128BitHLS,  serial_port="/dev/ttyUSB0", implementation="naive")
+target = cw.target(scope, SakuraXShellExampleAES128BitHLS,  serial_number="FT7A1234", implementation="naive")
 ```
 
 It also loads a default hardware handoff file, which is generated by Vivado to parse address map of the hardware design,
@@ -293,13 +315,13 @@ If you prepare the SDK for VexRiscv_SDK, you can build the AES-128 program binar
 ### Target specific options for SAKURA-X
 
 Similar to the shell-based examples, the pin 1 of CN8 is used for the trigger signal
-and `serial_port` keyword argument is also required.
+and board selection uses the same `serial_number`, `data_port`, and `reset_port` options as the shell-based examples.
 
 ```python
 import chipwhisperer as cw
 from cw_plugins.targets import SakuraXVexRISCVAESExample
 scope = cw.scope()  # or Visa oscilloscope
-target = cw.target(scope, SakuraXVexRISCVAESExample, serial_port="/dev/ttyUSB0", masked=True)
+target = cw.target(scope, SakuraXVexRISCVAESExample, serial_number="FT7A1234", masked=True)
 ```
 
 ### Target specific options for CW305

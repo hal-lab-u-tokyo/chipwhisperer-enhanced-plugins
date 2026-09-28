@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  27-03-2024 18:15:49
-#   Last Modified: 28-09-2026 10:58:45
+#   Last Modified: 28-09-2026 17:53:21
 ###
 
 
@@ -290,7 +290,6 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
             raise RuntimeError('Already connected; disconnect before reconnecting')
     
         selected, data_port, reset_port = self._resolve_ports(serial_number, data_port, reset_port)
-        print(f"Connecting to SAKURA-X Shell board {selected}: data={data_port}, reset={reset_port}")
     
         if (Path(data_port).resolve() == Path(reset_port).resolve()
                 or data_port.casefold() == reset_port.casefold()):

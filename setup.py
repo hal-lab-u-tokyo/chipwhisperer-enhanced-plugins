@@ -6,6 +6,7 @@ from setuptools.command.build_ext import build_ext
 
 from pathlib import Path
 import shutil
+from tempfile import TemporaryDirectory
 
 import_name = "cw_plugins"
 
@@ -111,36 +112,38 @@ class BuildPy(build_py):
         return mapping
 
 
-setup(
-    name=f'{import_name}',
-    version='1.0.0',
-    license='MIT',
-    description='python tools for power analysis-based side-channel attack',
+# Keep compiler intermediates and wheel staging outside the source checkout.
+with TemporaryDirectory(prefix="cw-plugins-build-") as build_root:
+    setup(
+        name=f'{import_name}',
+        license='MIT',
+        description='python tools for power analysis-based side-channel attack',
 
-    author='Takuya Kojima',
-    author_email='tkojima@hal.ipc.i.u-tokyo.ac.jp',
-    url='https://www.tkojima.me',
+        author='Takuya Kojima',
+        author_email='tkojima@hal.ipc.i.u-tokyo.ac.jp',
+        url='https://www.tkojima.me',
 
-    install_requires=[
-        "PyUSB>=1.2.1",
-        "pyvisa>=1.13.0",
-        "pycryptodome>=3.19.0",
-        "matplotlib>=3.8.0",
-        "numpy>=1.25.0",
-        "ipyfilechooser",
-        "pyelftools",
-        "h5py",
-        "pytest"
-    ],
+        install_requires=[
+            "PyUSB>=1.2.1",
+            "pyvisa>=1.13.0",
+            "pycryptodome>=3.19.0",
+            "matplotlib>=3.8.0",
+            "numpy>=1.25.0",
+            "ipyfilechooser",
+            "pyelftools",
+            "h5py",
+            "pytest"
+        ],
 
-    packages=find_packages(where='lib',exclude=['notebooks']),
-    package_dir={'': 'lib'},
-    include_package_data=True,
+        packages=find_packages(where='lib',exclude=['notebooks']),
+        package_dir={'': 'lib'},
+        include_package_data=True,
 
-    cmdclass={"build_ext": CMakeBuild, "build_py": BuildPy},
-    ext_modules=ext_modules,
+        cmdclass={"build_ext": CMakeBuild, "build_py": BuildPy},
+        ext_modules=ext_modules,
 
-    scripts=[]
+        options={"build": {"build_base": build_root}},
 
-)
+        scripts=[]
 
+    )

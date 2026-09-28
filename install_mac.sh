@@ -12,7 +12,7 @@ fi
 # check xcode command line tools are installed
 echo "-- Checking if xcode command line tools are installed."
 if test ! $(which xcode-select 2> /dev/null); then
-	printf "-- xcode command line tools is needed to build C++ acceleration libraries.\nWould you like to proceed without installing xcode command line tools? (y/n):"
+	printf '%s\n%s' '-- xcode command line tools is needed to build C++ acceleration libraries.' 'Would you like to proceed without installing xcode command line tools? (y/n):'
 	read answer
 	if [ "$answer" != "${answer#[Yy]}" ] ;then
 		echo "Proceeding without xcode command line tools."
@@ -27,7 +27,7 @@ fi
 NO_BREW=0
 echo "-- Checking if homebrew is installed."
 if test ! $(which brew 2> /dev/null); then
-	printf "homebrew is need to install OpenMP.\nWould you like to proceed without installing homebrew? (y/n):"
+	printf '%s\n%s' 'homebrew is need to install OpenMP.' 'Would you like to proceed without installing homebrew? (y/n):'
 	read answer
 	if [ "$answer" != "${answer#[Yy]}" ] ;then
 		echo "Proceeding without homebrew."
@@ -41,40 +41,36 @@ fi
 
 # check if cmake is installed
 echo "-- Checking if cmake is installed."
-if test ! $(which cmake 2> /dev/null); then
-	printf "-- cmake is needed to build C++ acceleration libraries.\nWould you like proceed without installing cmake? (y/n):"
-	read answer
-	if [ "$answer" != "${answer#[Yy]}" ] ;then
-		echo "Proceeding without cmake."
-		NO_CPP_LIB=1
+if ! command -v cmake >/dev/null 2>&1; then
+	echo '-- cmake is needed to build C++ acceleration libraries.'
+	if [ "$NO_BREW" -eq 0 ]; then
+		printf '%s' 'Would you like to install cmake? (y/n):'
+		read -r answer
+		case "$answer" in
+			[Yy]*) brew install cmake || exit 1 ;;
+			*) echo 'Quitting installation.'; exit 1 ;;
+		esac
 	else
-		if [ $NO_BREW -eq 0 ]; then
-			printf "Would you like to install cmake? (y/n):"
-			read answer
-			if [ "$answer" == "${answer#[Yy]}" ] ;then
-				brew install cmake
-			else
-				echo "Quitting installation."
-				exit 1;
-			fi
-		else
-			echo "Fatal: cmake is essential to build C++ acceleration libraries."
-			exit 1;
-		fi
+		printf '%s' 'Homebrew is unavailable. Continue without C++ acceleration libraries? (y/n):'
+		read -r answer
+		case "$answer" in
+			[Yy]*) echo 'Proceeding without cmake.'; NO_CPP_LIB=1 ;;
+			*) echo 'Quitting installation.'; exit 1 ;;
+		esac
 	fi
 fi
 
 # prepare venv
 echo "-- Preparing virtual environment."
 # ask where to install the virtual environment
-printf "Where would you like to install the virtual environment? (default: ./venv):"
+printf '%s' 'Where would you like to install the virtual environment? (default: ./venv):'
 read venv_path
 if [ -z "$venv_path" ]; then
 	venv_path="./venv"
 fi
 # create the virtual environment
 if [ -d "$venv_path" ]; then
-	printf "The directory $venv_path already exists. Would you like to use existing environment? (y/n):"
+	printf '%s' "The directory $venv_path already exists. Would you like to use existing environment? (y/n):"
 	read answer
 	if [ "$answer" == "${answer#[Yy]}" ] ;then
 		exit 1;

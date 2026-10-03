@@ -31,12 +31,6 @@ For example, to build the CUDA acceleration library, Cmake have to identify the 
 Otherwise, the CUDA acceleration library will not be built.
 If the libraries you want to use are not built, please see the CMake output during the installation process.
 
-
-### Known issues
-C++ libraries built with GCC 11 may produce incorrect second-order CPA analysis results on certain NVIDIA GPUs (e.g., RTX 5090).
-Use GCC 13 or later to avoid this issue.
-More details can be found in the [Issue #8](https://github.com/hal-lab-u-tokyo/chipwhisperer-enhanced-plugins/issues/8).
-
 # Installation script on macOS
 [install_mac.sh](../install_mac.sh) is provided at the root directory of this repository to simplify the installation process on macOS.
 

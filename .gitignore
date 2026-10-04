@@ -24,6 +24,8 @@ cucumber-report.json
 # python virtual environments
 **/.venv*/
 venv*
+uv.lock
+.python-version
 
 port.txt
 precommit.hook
@@ -38,7 +40,6 @@ obj/**
 *.so
 .pytest_cache
 tmp/**
-.python-version
 .vs/
 test-results*.xml
 xunit-test-results.xml

@@ -12,6 +12,25 @@ from cw_plugins.targets import *
 from ipyfilechooser import FileChooser
 from chipwhisperer.common.api import ProjectFormat as project
 import os
+from weakref import WeakKeyDictionary
+
+
+# Keep GUI selections and successfully applied channels separate: editing a
+# selector does not change the channel already configured on the instrument.
+_scope_channels = WeakKeyDictionary()
+
+
+def _register_channel_selector(scope, role, selector):
+    state = _scope_channels.setdefault(scope, {'selected': {}, 'applied': {}})
+    state['selected'][role] = selector.value
+    selector.observe(lambda change: state['selected'].__setitem__(role, change['new']), names='value')
+    return state
+
+
+def _check_channel_conflict(state, role, channel):
+    other = 'trace' if role == 'trigger' else 'trigger'
+    if channel in (state['selected'].get(other), state['applied'].get(other)):
+        raise ValueError('Trigger Channel and Trace Channel must be different channels.')
 
 # ==============  VISA Oscilloscope Management ==============
 VisaAddress = None
@@ -90,6 +109,7 @@ def get_trigger_panel(scope):
     mode_sel = Dropdown(value="rising", options=list(mode_dict.keys()), description='Mode:')
 
     ch_sel = Dropdown(value=1, options=[i + 1 for i in range(scope.get_num_channels())], description='Channel:')
+    channels = _register_channel_selector(scope, 'trigger', ch_sel)
 
     scale_input = BoundedFloatText(value=1.0, min=0.0, max=1000.0, step = 0.1, description='Scale:')
     scale_unit = Dropdown(value="V", options=["V", "mV"])
@@ -114,11 +134,14 @@ def get_trigger_panel(scope):
             offset /= 1000.0
 
         try:
+            _check_channel_conflict(channels, 'trigger', channel)
             scope.config_trigger_channel(mode, channel, scale, offset)
         except Exception as e:
             msg.value = f"Error: {str(e)}"
             return
     
+        channels['applied']['trigger'] = channel
+        msg.value = ''
         apply_button.disabled = True
         apply_button.description = "applied"
         apply_button.button_style = 'success'
@@ -153,6 +176,7 @@ def get_trace_panel(scope):
         "ns": 1e-9,
     }
     ch_sel = Dropdown(value=1, options=[i + 1 for i in range(scope.get_num_channels())], description='Channel:')
+    channels = _register_channel_selector(scope, 'trace', ch_sel)
 
     scale_input = BoundedFloatText(value=1.0, min=0.0, max=100.0, step = 0.1, description='Scale:')
     scale_unit = Dropdown(value="mV", options=["V", "mV"])
@@ -186,11 +210,14 @@ def get_trace_panel(scope):
         delay *= time_scale_dict[delay_unit.value]
 
         try:
+            _check_channel_conflict(channels, 'trace', channel)
             scope.config_trace_channel(channel, scale, offset, period, delay)
         except Exception as e:
             msg.value = f"Error: {str(e)}"
             return
 
+        channels['applied']['trace'] = channel
+        msg.value = ''
         apply_button.disabled = True
         apply_button.description = "applied"
         apply_button.button_style = 'success'
@@ -231,11 +258,21 @@ class BoardSettingsPanel:
 
         # sakura-x options
         self.sakurax_opt_label = Label(value="Options for SAKURA-X Board:")
-        self.comport_sel = Dropdown(options=[comport.device for comport in serial.tools.list_ports.comports()], description='Select COM Port:', **self.STYLE)
-        self.comport_sel.options = list(self.comport_sel.options)
+        ports = [''] + [port.device for port in serial.tools.list_ports.comports()]
+        self.data_port_sel = Dropdown(options=ports, value='', description='Data Port:', **self.STYLE)
+        self.reset_port_sel = Dropdown(options=ports, value='', description='Reset Port:', **self.STYLE)
+        self.auto_detect = Checkbox(value=False, description='Auto detect')
+        self.sakurax_options = VBox([
+            self.sakurax_opt_label, self.auto_detect,
+            self.data_port_sel, self.reset_port_sel,
+        ])
 
-        if len(self.comport_sel.options) > 0:
-            self.comport_sel.value = self.comport_sel.options[0]
+        def update_auto_detect(change):
+            enabled = change['new']
+            self.data_port_sel.disabled = enabled
+            self.reset_port_sel.disabled = enabled
+
+        self.auto_detect.observe(update_auto_detect, names='value')
 
         # rtl options
         self.rtl_opt_label = Label(value="Options for RTL Implementation:")
@@ -258,20 +295,17 @@ class BoardSettingsPanel:
 
         def update_board_options(change):
             if change['new'] == "SAKURA-X":
-                self.sakurax_opt_label.layout.display = "block"
-                self.comport_sel.layout.display = "block"
+                self.sakurax_options.layout.display = "block"
                 self.bitfile_sel.layout.display = "none"
                 self.hwhfile_sel.layout.display = "none"
                 self.cw305_opt_label.layout.display = 'none'
             elif change['new'] == "CW305":
-                self.sakurax_opt_label.layout.display = "none"
-                self.comport_sel.layout.display = "none"
+                self.sakurax_options.layout.display = "none"
                 self.bitfile_sel.layout.display = "block"
                 self.hwhfile_sel.layout.display = "block"
                 self.cw305_opt_label.layout.display = 'block'
             else:
-                self.sakurax_opt_label.layout.display = "none"
-                self.comport_sel.layout.display = "none"
+                self.sakurax_options.layout.display = "none"
                 self.bitfile_sel.layout.display = "none"
                 self.hwhfile_sel.layout.display = "none"
                 self.cw305_opt_label.layout.display = 'none'
@@ -297,7 +331,7 @@ class BoardSettingsPanel:
         self.target_sel.observe(lambda change: update_target_options(change), names='value')
 
     def show(self):
-        display(VBox([self.board_sel, self.target_sel, self.comport_sel, self.cw305_opt_label, self.bitfile_sel, self.hwhfile_sel, self.rtl_opt_label, self.rtl_impl_sel, self.soft_opt_label, self.soft_masking]))
+        display(VBox([self.board_sel, self.target_sel, self.sakurax_options, self.cw305_opt_label, self.bitfile_sel, self.hwhfile_sel, self.rtl_opt_label, self.rtl_impl_sel, self.soft_opt_label, self.soft_masking]))
 
 boardPanel = None
 def showBoardSettingsPanel():
@@ -314,13 +348,20 @@ def connectBoard(scope):
     target = None
 
     if board_type == "SAKURA-X":
+        ports = {}
+        if not boardPanel.auto_detect.value:
+            ports = dict(data_port=boardPanel.data_port_sel.value, reset_port=boardPanel.reset_port_sel.value)
+            if not all(ports.values()):
+                raise ValueError('Select both Data Port and Reset Port, or enable Auto detect.')
+            if ports['data_port'] == ports['reset_port']:
+                raise ValueError('Data Port and Reset Port must be different ports.')
         if boardPanel.target_sel.value == "AES RTL":
             rtl_impl = boardPanel.rtl_impl_sel.value
-            target = cw.target(scope, SakuraXShellExampleAES128BitRTL, serial_port=boardPanel.comport_sel.value, implementation=rtl_impl)
+            target = cw.target(scope, SakuraXShellExampleAES128BitRTL, **ports, implementation=rtl_impl)
         elif boardPanel.target_sel.value == "AES HLS":
-            target = cw.target(scope, SakuraXShellExampleAES128BitHLS, serial_port=boardPanel.comport_sel.value)
+            target = cw.target(scope, SakuraXShellExampleAES128BitHLS, **ports)
         elif boardPanel.target_sel.value == "AES VexRiscV":
-            target = cw.target(scope, SakuraXVexRISCVAESExample, serial_port=boardPanel.comport_sel.value, masked = boardPanel.soft_masking.value)
+            target = cw.target(scope, SakuraXVexRISCVAESExample, **ports, masked = boardPanel.soft_masking.value)
 
     elif board_type == "CW305":
         kwargs = {}
@@ -510,4 +551,3 @@ def showCapturePanel(scope, target):
     if capturePanel is None:
         capturePanel = CapturePanel(scope, target)
     capturePanel.show()        
-

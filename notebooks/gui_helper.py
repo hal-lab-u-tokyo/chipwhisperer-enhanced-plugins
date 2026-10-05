@@ -532,6 +532,7 @@ class CapturePanel:
             trace = cw.capture_trace(self.scope, self.target, text, self.key, as_int = True)
             if trace is None:
                 continue
+            print("trace length: ", len(trace))
             self.project.traces.append(trace)
             self.progress_bar.update(1)
 
@@ -551,3 +552,159 @@ def showCapturePanel(scope, target):
     if capturePanel is None:
         capturePanel = CapturePanel(scope, target)
     capturePanel.show()        
+
+
+# ============== ChipWhisperer Lite / Husky Scope Settings ==============
+class CWScopeSettingsPanel:
+    """Configure an already connected cw.scope(); no settings change until apply.
+
+    Sampling rate is generated from CLKGEN and the ADC multiplier. Changing it
+    also changes the clock on HS2 when that output is enabled.
+    """
+    STYLE = {"style": {"description_width": "initial"},
+             "layout": {"width": "max-content"}}
+
+    def __init__(self, scope):
+        self.scope = scope
+        name = scope.get_name()
+        if name not in ("ChipWhisperer Lite", "ChipWhisperer Husky"):
+            raise ValueError("Only ChipWhisperer Lite and Husky are supported.")
+        self.is_husky = name == "ChipWhisperer Husky"
+        clock, adc = scope.clock, scope.adc
+        rate = float(clock.adc_freq) / int(adc.decimate)
+        self.rate_input = BoundedFloatText(
+            value=max(0.001, rate / 1e6), min=0.001,
+            max=200 if self.is_husky else 105, step=0.1,
+            description='Sampling Rate (MSa/s):', **self.STYLE)
+        self.time_units = {'s': 1, 'ms': 1e-3, 'us': 1e-6, 'ns': 1e-9}
+        initial_rate = rate if rate > 0 else self.rate_input.value * 1e6
+
+        def time_field(value, description):
+            field = BoundedFloatText(value=value / initial_rate * 1e6,
+                                     min=0, max=1e12, step=0.1,
+                                     description=description, **self.STYLE)
+            unit = Dropdown(value='us', options=list(self.time_units),
+                            layout={'width': '65px', 'min_width': '65px'})
+            return field, unit
+
+        self.length_input, self.length_unit = time_field(adc.samples, 'Trace Length:')
+        self.length_input.value = 10.0
+        self.presample_input, self.presample_unit = time_field(adc.presamples, 'Pretrigger:')
+        self.delay_input, self.delay_unit = time_field(adc.offset, 'Delay:')
+        self.gain_input = BoundedFloatText(value=float(scope.gain.db), min=-6.5, max=56, step=0.5,
+                                          description='Gain (dB):', **self.STYLE)
+        self.trigger_input = Text(value=scope.trigger.triggers, description='Trigger Pins:', **self.STYLE)
+        self.mode_input = Dropdown(value='rising_edge', options=['rising_edge', 'falling_edge', 'high', 'low'],
+                                   description='Trigger Mode:', **self.STYLE)
+        self.timeout_input = BoundedFloatText(value=float(adc.timeout), min=0.001, max=1e6, step=0.1,
+                                             description='Timeout (s):', **self.STYLE)
+        self.apply_button = Button(description='apply', layout={"width": "max-content"})
+        self.msg = Label(value='')
+        self.inputs = [self.rate_input, self.length_input, self.length_unit,
+                       self.presample_input, self.presample_unit, self.delay_input,
+                       self.delay_unit, self.gain_input,
+                       self.trigger_input, self.mode_input, self.timeout_input]
+        for item in self.inputs:
+            item.observe(self._changed, names='value')
+        self.apply_button.on_click(self.apply)
+        self.panel = VBox([Label(value=f'Detected board: {name}'),
+                           self.rate_input,
+                           HBox([self.length_input, self.length_unit,
+                                 self.presample_input, self.presample_unit,
+                                 self.delay_input, self.delay_unit]),
+                           self.gain_input, self.trigger_input, self.mode_input,
+                           self.timeout_input, HBox([self.apply_button, self.msg])])
+
+    def _changed(self, change):
+        self.apply_button.disabled = False
+        self.apply_button.description = 'apply'
+        self.apply_button.button_style = ''
+        self.msg.value = ''
+
+    def apply(self, button=None):
+        scope = self.scope
+        try:
+            durations = [field.value * self.time_units[unit.value] for field, unit in
+                         [(self.length_input, self.length_unit),
+                          (self.presample_input, self.presample_unit),
+                          (self.delay_input, self.delay_unit)]]
+            length, pretrigger, delay = durations
+            if length <= 0:
+                raise ValueError('Trace Length must be positive.')
+            if not 0 <= pretrigger < length:
+                raise ValueError('Pretrigger must be nonnegative and smaller than Trace Length.')
+            if delay < 0:
+                raise ValueError('Delay must be nonnegative.')
+            if not self.trigger_input.value.strip():
+                raise ValueError('Specify Trigger Pins, for example tio4.')
+            # Husky uses the same x1 ADC clock as the working SAKURA test.
+            # Lite retains its current supported x1/x4 source.
+            multiplier = (1 if self.is_husky else
+                          (4 if scope.clock.adc_src.endswith('x4') else 1))
+            if multiplier < 1:
+                raise ValueError('ADC clock is disabled; initialize the scope clock first.')
+            frequency = self.rate_input.value * 1e6 * int(scope.adc.decimate) / multiplier
+            if frequency < 3.2e6:
+                raise ValueError('Requested sampling rate is too low for the current ADC clock configuration.')
+            scope.clock.clkgen_src = 'system'
+            if self.is_husky:
+                scope.clock.adc_mul = 1
+            else:
+                scope.clock.adc_src = f'clkgen_x{multiplier}'
+            scope.clock.clkgen_freq = frequency
+            scope.clock.reset_dcms()
+            if not scope.clock.adc_locked:
+                raise RuntimeError('ADC clock is not locked. Wait briefly and apply again.')
+            rate = float(scope.clock.adc_freq) / int(scope.adc.decimate)
+            if rate <= 0:
+                raise RuntimeError('ADC sampling rate is unavailable. Apply again after clock stabilization.')
+            # Use the actual rate, since synthesized clocks can differ from the
+            # requested rate. Round to the nearest whole sample (half up).
+            samples, presamples, offset = [int(t * rate + 0.5) for t in durations]
+            maximum = getattr(scope.adc, 'max_samples', 131124 if self.is_husky else 24400)
+            if not 1 <= samples <= maximum:
+                raise ValueError(f'Trace Length must resolve to 1–{maximum} samples at {rate / 1e6:.6g} MSa/s.')
+            if not 0 <= presamples < samples:
+                raise ValueError('Pretrigger must resolve to fewer samples than Trace Length.')
+            scope.adc.presamples = 0
+            scope.adc.samples = samples
+            scope.adc.presamples = presamples
+            scope.adc.offset = offset
+            scope.adc.timeout = self.timeout_input.value
+            scope.gain.db = self.gain_input.value
+            if self.is_husky:
+                scope.trigger.module = 'basic'
+            # Leave trigger pins as inputs, as in the CW acquisition notebook.
+            for pin in ('tio1', 'tio2', 'tio3', 'tio4'):
+                if pin in self.trigger_input.value.lower().split():
+                    setattr(scope.io, pin, 'high_z')
+            scope.trigger.triggers = self.trigger_input.value
+            scope.adc.basic_mode = self.mode_input.value
+            rate = float(scope.clock.adc_freq) / int(scope.adc.decimate)
+            self.msg.value = (f'Applied: {rate / 1e6:.6g} MSa/s, {scope.adc.samples} samples, '
+                              f'length {scope.adc.samples / rate * 1e6:.6g} us, '
+                              f'pretrigger {scope.adc.presamples / rate * 1e6:.6g} us, '
+                              f'delay {scope.adc.offset / rate * 1e6:.6g} us')
+        except Exception as error:
+            self.apply_button.disabled = False
+            self.apply_button.description = 'apply'
+            self.apply_button.button_style = 'danger'
+            self.msg.value = f'Error: {error} (some settings may already have changed; correct and apply again.)'
+            return
+        self.apply_button.disabled = True
+        self.apply_button.description = 'applied'
+        self.apply_button.button_style = 'success'
+
+    def show(self):
+        display(self.panel)
+
+
+def get_cw_scope_panel(scope):
+    """Return a Lite/Husky settings widget for an existing cw.scope()."""
+    return CWScopeSettingsPanel(scope).panel
+
+
+def showCWScopeConfig(scope):
+    """Display Lite/Husky setup: scope = cw.scope(); showCWScopeConfig(scope)."""
+    panel = CWScopeSettingsPanel(scope)
+    panel.show()

@@ -191,6 +191,11 @@ def get_trace_panel(scope):
     delay_input = BoundedFloatText(value=0.0, min=-1000.0, max=1000.0, step = 0.1, description='Delay:')
     delay_unit = Dropdown(value="us", options=time_scale_dict.keys())
 
+    impedance_sel = Dropdown(
+        options=[("Keep current", None), ("50 Ω", 50), ("1 MΩ", 1000000)],
+        value=None, description="Input Impedance:",
+        style={"description_width": "initial"}, layout={"width": "max-content"})
+
     apply_button = Button(description="apply", button_style='', layout={"width": "max-content"})
     apply_button.disabled = False
 
@@ -211,7 +216,10 @@ def get_trace_panel(scope):
 
         try:
             _check_channel_conflict(channels, 'trace', channel)
-            scope.config_trace_channel(channel, scale, offset, period, delay)
+            kwargs = {}
+            if impedance_sel.value is not None:
+                kwargs["impedance"] = impedance_sel.value
+            scope.config_trace_channel(channel, scale, offset, period, delay, **kwargs)
         except Exception as e:
             msg.value = f"Error: {str(e)}"
             return
@@ -238,10 +246,11 @@ def get_trace_panel(scope):
     period_unit.observe(lambda _: button_unclicked(), names='value')
     delay_input.observe(lambda _: button_unclicked(), names='value')
     delay_unit.observe(lambda _: button_unclicked(), names='value')
+    impedance_sel.observe(lambda _: button_unclicked(), names='value')
 
     apply_button.on_click(lambda _: apply_trace_config())
 
-    return VBox([ch_sel, HBox([scale_input, scale_unit]), HBox([offset_input, offset_unit]), HBox([period_input, period_unit]), HBox([delay_input, delay_unit]), HBox([apply_button, msg])])
+    return VBox([ch_sel, HBox([scale_input, scale_unit]), HBox([offset_input, offset_unit]), HBox([period_input, period_unit]), HBox([delay_input, delay_unit]), impedance_sel, HBox([apply_button, msg])])
 
 def showTraceConfig(scope):
     display(get_trace_panel(scope))
@@ -579,9 +588,9 @@ class CWScopeSettingsPanel:
         self.time_units = {'s': 1, 'ms': 1e-3, 'us': 1e-6, 'ns': 1e-9}
         initial_rate = rate if rate > 0 else self.rate_input.value * 1e6
 
-        def time_field(value, description):
+        def time_field(value, description, minimum=0):
             field = BoundedFloatText(value=value / initial_rate * 1e6,
-                                     min=0, max=1e12, step=0.1,
+                                     min=minimum, max=1e12, step=0.1,
                                      description=description, **self.STYLE)
             unit = Dropdown(value='us', options=list(self.time_units),
                             layout={'width': '65px', 'min_width': '65px'})
@@ -589,8 +598,8 @@ class CWScopeSettingsPanel:
 
         self.length_input, self.length_unit = time_field(adc.samples, 'Trace Length:')
         self.length_input.value = 10.0
-        self.presample_input, self.presample_unit = time_field(adc.presamples, 'Pretrigger:')
-        self.delay_input, self.delay_unit = time_field(adc.offset, 'Delay:')
+        initial_delay = -adc.presamples if adc.presamples else adc.offset
+        self.delay_input, self.delay_unit = time_field(initial_delay, 'Delay:', minimum=-1e12)
         self.gain_input = BoundedFloatText(value=float(scope.gain.db), min=-6.5, max=56, step=0.5,
                                           description='Gain (dB):', **self.STYLE)
         self.trigger_input = Text(value=scope.trigger.triggers, description='Trigger Pins:', **self.STYLE)
@@ -601,7 +610,7 @@ class CWScopeSettingsPanel:
         self.apply_button = Button(description='apply', layout={"width": "max-content"})
         self.msg = Label(value='')
         self.inputs = [self.rate_input, self.length_input, self.length_unit,
-                       self.presample_input, self.presample_unit, self.delay_input,
+                       self.delay_input,
                        self.delay_unit, self.gain_input,
                        self.trigger_input, self.mode_input, self.timeout_input]
         for item in self.inputs:
@@ -610,7 +619,6 @@ class CWScopeSettingsPanel:
         self.panel = VBox([Label(value=f'Detected board: {name}'),
                            self.rate_input,
                            HBox([self.length_input, self.length_unit,
-                                 self.presample_input, self.presample_unit,
                                  self.delay_input, self.delay_unit]),
                            self.gain_input, self.trigger_input, self.mode_input,
                            self.timeout_input, HBox([self.apply_button, self.msg])])
@@ -624,17 +632,15 @@ class CWScopeSettingsPanel:
     def apply(self, button=None):
         scope = self.scope
         try:
-            durations = [field.value * self.time_units[unit.value] for field, unit in
-                         [(self.length_input, self.length_unit),
-                          (self.presample_input, self.presample_unit),
-                          (self.delay_input, self.delay_unit)]]
-            length, pretrigger, delay = durations
+            length = self.length_input.value * self.time_units[self.length_unit.value]
+            signed_delay = self.delay_input.value * self.time_units[self.delay_unit.value]
+            pretrigger = max(0.0, -signed_delay)
+            delay = max(0.0, signed_delay)
+            durations = [length, pretrigger, delay]
             if length <= 0:
                 raise ValueError('Trace Length must be positive.')
             if not 0 <= pretrigger < length:
                 raise ValueError('Pretrigger must be nonnegative and smaller than Trace Length.')
-            if delay < 0:
-                raise ValueError('Delay must be nonnegative.')
             if not self.trigger_input.value.strip():
                 raise ValueError('Specify Trigger Pins, for example tio4.')
             # Husky uses the same x1 ADC clock as the working SAKURA test.
@@ -683,8 +689,7 @@ class CWScopeSettingsPanel:
             rate = float(scope.clock.adc_freq) / int(scope.adc.decimate)
             self.msg.value = (f'Applied: {rate / 1e6:.6g} MSa/s, {scope.adc.samples} samples, '
                               f'length {scope.adc.samples / rate * 1e6:.6g} us, '
-                              f'pretrigger {scope.adc.presamples / rate * 1e6:.6g} us, '
-                              f'delay {scope.adc.offset / rate * 1e6:.6g} us')
+                              f'delay {(scope.adc.offset - scope.adc.presamples) / rate * 1e6:.6g} us')
         except Exception as error:
             self.apply_button.disabled = False
             self.apply_button.description = 'apply'

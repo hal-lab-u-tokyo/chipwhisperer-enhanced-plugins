@@ -4,9 +4,9 @@ from cw_plugins.scopes.base import ScopeBase, TriggerMode
 import numpy as np
 import pypicosdk as psdk
 
-class PicoScope3000(ScopeBase):
+class PicoScope3000E(ScopeBase):
     """
-        PicoScope 3000 series oscilloscope class
+        PicoScope 3000E series oscilloscope class
     """
 
     slope_map = {
@@ -27,7 +27,7 @@ class PicoScope3000(ScopeBase):
         "DC": psdk.COUPLING.DC,
     }
 
-    def __init__(self, model="PicoScope3000", resource=None, timeout=5000):
+    def __init__(self, model="PicoScope3000E", resource=None, timeout=5000):
     # resource/timeout are kept for API compatibility with ScopeBase.
     # PicoScope does not use VISA resource, so do not call ScopeBase.__init__().
         self.resource = resource if resource is not None else DummyResource()

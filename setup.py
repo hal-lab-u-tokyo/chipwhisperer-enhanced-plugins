@@ -129,6 +129,7 @@ with TemporaryDirectory(prefix="cw-plugins-build-") as build_root:
             "pycryptodome>=3.19.0",
             "matplotlib>=3.8.0",
             "numpy>=1.25.0",
+            "pypicosdk>=1.7.5",
             "ipyfilechooser",
             "pyelftools",
             "h5py",

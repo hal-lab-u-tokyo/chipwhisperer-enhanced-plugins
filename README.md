@@ -79,6 +79,11 @@ This project follows the version of ChipWhisperer for which compatibility has be
 ## Getting Started
 See the Setup Guide of [documentation](./docs/README.md) for instructions on how to set up the environment and run the analysis.
 
+## Code Samples
+* [Trace acquisition](./notebooks/acquire_traces_code.ipynb)
+* [GUI-based acquisition of traces with a ChipWhisperer scope](./notebooks/acquire_traces_cw_scope.ipynb)
+* [GUI-based acquisition of traces with a VISA oscilloscope](./notebooks/acquire_traces_with_visa_scope.ipynb)
+
 ## Tutorials
 * [Tutorial 1: 1st-order CPA on DPA Contest V2 dataset](./notebooks/tutorial_cpa.ipynb)
 * [Tutorial 2: 2nd-order CPA on ASCAD dataset](./notebooks/tutorial_socpa.ipynb)

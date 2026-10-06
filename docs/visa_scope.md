@@ -1,6 +1,6 @@
 # VISA Scope Support for ChipWhisperer API
 
-We have developed a base class to enable VISA-compatible oscilloscopes to integrate seamlessly with the ChipWhisperer API, including routines like `cw.capture_trace`. For detailed usage examples, refer to the tutorial notebook [Acquiring Traces](../notebooks/acquire_traces.ipynb).
+We have developed a base class to enable VISA-compatible oscilloscopes to integrate seamlessly with the ChipWhisperer API, including routines like `cw.capture_trace`. For detailed usage examples, refer to [Code samples for acquiring traces](../notebooks/acquire_traces_code.ipynb) or the [GUI-based acquisition of traces with a VISA oscilloscope](../notebooks/acquire_traces_with_visa_scope.ipynb).
 
 ### Current Limitations
 At present, the implementation does not support batch acquisition, meaning it cannot store multiple traces on the oscilloscope memory in a single call to minimize the number of VISA calls. This is a known limitation, and we plan to address it in future updates.

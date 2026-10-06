@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   notebook:
     build:
@@ -10,8 +8,16 @@ services:
     environment:
       - JUPYTER_PORT=${JUPYTER_PORT:-8888}
       - JUPYTER_TOKEN=${JUPYTER_TOKEN:-chipwhisperer}
+      - DOCKER_UID=${DOCKER_UID:-0}
+      - DOCKER_GID=${DOCKER_GID:-0}
+    devices:
+      # - /dev/ttyUSB0:/dev/ttyUSB0
+      # - /dev/ttyUSB1:/dev/ttyUSB1
+      - /dev/bus/usb:/dev/bus/usb
     ports:
       - ${JUPYTER_PORT:-8888}:${JUPYTER_PORT:-8888}
     volumes:
       - ${NOTEBOOK_DIR:-./notebooks}:/workspace/notebooks
       - ${DATA_DIR:-./data}:/workspace/data
+    user: "${DOCKER_UID}:${DOCKER_GID}"
+

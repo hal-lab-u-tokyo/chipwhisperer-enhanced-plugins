@@ -2,12 +2,13 @@ import serial
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-# Serial port settings
-port = "/dev/ttyUSB4"
-baudrate = 115200
+from argparse import ArgumentParser
 
-# Serial port open
-ser = serial.Serial(port, baudrate)
+def parse_args():
+    parser = ArgumentParser(description="ESP32 AES128 Test Driver")
+    parser.add_argument("-p", "--port", type=str, default="/dev/ttyUSB0", help="Serial port")
+    parser.add_argument("-b", "--baudrate", type=int, default=115200, help="Baudrate")
+    return parser.parse_args()
 
 CMD_SET_KEY 		= 0x11
 CMD_SET_PLAINTEXT	= 0x12
@@ -16,29 +17,29 @@ CMD_GET_CIPHERTEXT	= 0x14
 CMD_GET_DEBUG		= 0x15
 
 # Send data
-def send_data(data):
+def send_data(ser, data):
     ser.write(data.encode())
 
 # Receive data
-def read_data():
+def read_data(ser):
     while True:
         if ser.in_waiting > 0:
             incoming_data = ser.readline()
             print("Received:", incoming_data.decode().strip())
 
-def set_key(key):
+def set_key(ser, key):
     buf = b""
     buf += CMD_SET_KEY.to_bytes(1, 'big')
     buf += key
     ser.write(buf)
 
-def set_plaintext(plaintext):
+def set_plaintext(ser, plaintext):
     buf = b""
     buf += CMD_SET_PLAINTEXT.to_bytes(1, 'big')
     buf += plaintext
     ser.write(buf)
 
-def encrypt():
+def encrypt(ser):
     buf = b""
     buf += CMD_ENCRYPT.to_bytes(1, 'big')
     ser.write(buf)
@@ -46,13 +47,13 @@ def encrypt():
     if stat[0] != 0:
         print("Error: encrypt failed")
 
-def get_ciphertext():
+def get_ciphertext(ser):
     buf = b""
     buf += CMD_GET_CIPHERTEXT.to_bytes(1, 'big')
     ser.write(buf)
     return ser.read(16)
 
-def get_debug():
+def get_debug(ser):
     buf = b""
     buf += CMD_GET_DEBUG.to_bytes(1, 'big')
     ser.write(buf)
@@ -84,29 +85,39 @@ def create_cipher():
     cipher = AES.new(key, AES.MODE_ECB)
     return (key, cipher)
 
-# flush serial buffer
-# ser.reset_input_buffer()
+if __name__ == "__main__":
+    args = parse_args()
+    port = args.port
+    baudrate = args.baudrate
 
-key, cipher = create_cipher()
-print("Key: ")
-print_hex_128bit(key)
-set_key(key)
+    # Serial port open
+    ser = serial.Serial(port, baudrate)
 
-pt, correct_ct = prepare_data(cipher)
-print("Plain text: ")
-print_hex_128bit(pt)
-set_plaintext(pt)
+    # set key
+    key, cipher = create_cipher()
+    print("Key: ")
+    print_hex_128bit(key)
+    set_key(key)
 
-encrypt()
+    # set plaintext & expect ciphertext
+    pt, correct_ct = prepare_data(cipher)
+    print("Plain text: ")
+    print_hex_128bit(pt)
+    set_plaintext(pt)
 
-ct = get_ciphertext()
-print("Cipher text: ")
-print_hex_128bit(ct)
-if ct == correct_ct:
-    print("Correct!")
-else:
-    print("Correct Cipher text: ")
-    print_hex_128bit(correct_ct)
-    get_debug()
+    # run encryption
+    encrypt()
 
-ser.close()
+
+    # verify ciphertext
+    ct = get_ciphertext()
+    print("Cipher text: ")
+    print_hex_128bit(ct)
+    if ct == correct_ct:
+        print("Correct!")
+    else:
+        print("Correct Cipher text: ")
+        print_hex_128bit(correct_ct)
+        get_debug()
+
+    ser.close()

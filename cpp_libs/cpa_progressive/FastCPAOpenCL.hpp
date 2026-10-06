@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:58
-*    Last Modified: 17-02-2024 22:08:22
+*    Last Modified: 03-05-2025 16:11:10
 */
 
 #ifndef FASTCPAOPENCL_H
@@ -64,6 +64,8 @@ protected:
 	cl_device_id device_id;
 	cl_kernel sum_hypothesis_kernel, sum_hypothesis_trace_kernel;
 
+	size_t max_group_size;
+	size_t sqrt_max_group_size;
 
 	virtual const char** get_sum_hypothesis_kernel_code() { return &sum_hypothesis_kernel_code; }
 	virtual const char** get_sum_hypothesis_trace_kernel_code() { return &sum_hypothesis_trace_kernel_code; }

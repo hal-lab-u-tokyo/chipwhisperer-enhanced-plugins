@@ -19,7 +19,14 @@ cucumber-report.json
 **/.vscode-test/**
 **/.vscode test/**
 **/.vscode-smoke/**
+.vscode
+
+# python virtual environments
 **/.venv*/
+venv*
+uv.lock
+.python-version
+
 port.txt
 precommit.hook
 pythonFiles/lib/**
@@ -29,9 +36,10 @@ languageServer/**
 languageServer.*/**
 bin/**
 obj/**
+*.o
+*.so
 .pytest_cache
 tmp/**
-.python-version
 .vs/
 test-results*.xml
 xunit-test-results.xml
@@ -48,10 +56,22 @@ dist/**
 package.nls.*.json
 l10n/
 
-venv*
-*.cwp
-.vscode
-*.npy
-*.egg-info
-*.so
+# Jupyter Notebook checkpoints
 *.ipynb_checkpoints
+
+
+# chipwhisperer project files except for pytest
+*.cwp
+!pytest/*.cwp
+*.npy
+!pytest/*_data/traces/*.npy
+
+# python package related files
+*.egg-info
+
+# log file in datasets subdirectories
+datasets/**/**/*.log
+
+# in case of editable installation
+lib/cw_plugins/targets/bitstreams/*
+lib/cw_plugins/targets/hwh_files/*

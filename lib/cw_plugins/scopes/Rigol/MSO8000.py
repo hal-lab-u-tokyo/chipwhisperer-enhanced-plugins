@@ -105,7 +105,7 @@ class MSO8000(ScopeBase):
         self.set_vertical_scale(channel, scale)
         self.set_vertical_offset(channel, offset)
         self.write(":TRIGger:MODE EDGE")
-        self.write(":TRIGger:EDGE:LEVel {scale:e}")
+        self.write(f":TRIGger:EDGE:LEVel {scale:e}")
         self.write(f":TRIGger:EDGE:SOURCE CHAN{channel}")
         self.write(f":TRIGger:EDGE:SLOPe {self.slope_str[mode]}")
 

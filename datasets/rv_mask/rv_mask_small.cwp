@@ -1,0 +1,38 @@
+[Trace Management]
+tracefile0 = rv_mask_small_data/traces/config_part_0.cfg
+enabled0 = True
+tracefile1 = rv_mask_small_data/traces/config_part_1.cfg
+enabled1 = True
+tracefile2 = rv_mask_small_data/traces/config_part_2.cfg
+enabled2 = True
+tracefile3 = rv_mask_small_data/traces/config_part_3.cfg
+enabled3 = True
+tracefile4 = rv_mask_small_data/traces/config_part_4.cfg
+enabled4 = True
+tracefile5 = rv_mask_small_data/traces/config_part_5.cfg
+enabled5 = True
+tracefile6 = rv_mask_small_data/traces/config_part_6.cfg
+enabled6 = True
+tracefile7 = rv_mask_small_data/traces/config_part_7.cfg
+enabled7 = True
+tracefile8 = rv_mask_small_data/traces/config_part_8.cfg
+enabled8 = True
+tracefile9 = rv_mask_small_data/traces/config_part_9.cfg
+enabled9 = True
+tracefile10 = rv_mask_small_data/traces/config_part_10.cfg
+enabled10 = True
+tracefile11 = rv_mask_small_data/traces/config_part_11.cfg
+enabled11 = True
+tracefile12 = rv_mask_small_data/traces/config_part_12.cfg
+enabled12 = True
+tracefile13 = rv_mask_small_data/traces/config_part_13.cfg
+enabled13 = True
+tracefile14 = rv_mask_small_data/traces/config_part_14.cfg
+enabled14 = True
+[ChipWhisperer]
+[[General Settings]]
+Project Name = RV MASK small version
+Project File Version = 1.00
+Project Author = Takuya Kojima
+Program Name = ChipWhisperer
+Program Version = ""

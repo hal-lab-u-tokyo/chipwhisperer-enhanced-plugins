@@ -1,3 +1,12 @@
+###
+#   Copyright (C) 2025 The University of Tokyo
+#   
+#   File:          /lib/cw_plugins/analyzer/attacks/cpa_algorithms/fast_progressive.py
+#   Project:       sca_toolbox
+#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+#   Created Date:  30-05-2025 08:02:45
+#   Last Modified: 30-05-2025 09:27:24
+###
 import numpy as np
 
 from chipwhisperer.analyzer.attacks.algorithmsbase import AlgorithmsBase
@@ -5,6 +14,7 @@ from chipwhisperer.logging import *
 
 
 from .models import get_c_model
+
 
 class FastCPAProgressive(AlgorithmsBase):
     """
@@ -23,12 +33,11 @@ class FastCPAProgressive(AlgorithmsBase):
 
     def getCpaKernel(self, byte_len, numpoints, model):
         from .cpa_kernel import FastCPA
-        return FastCPA(byte_len, numpoints, model)
+        return FastCPA(byte_len, numpoints, model, False)
 
     def addTraces(self, traceSource, tracerange, progressBar=None, pointRange=None):
         numtraces = tracerange[1] - tracerange[0]
         numpoints = pointRange[1] - pointRange[0]
-
 
         byte_len = max(self.brange) + 1
 
@@ -49,9 +58,12 @@ class FastCPAProgressive(AlgorithmsBase):
             trange = range(tstart, tend)
             part_trace = np.array([traceSource.get_trace(t + tracerange[0])[pointRange[0]:pointRange[1]] for t in trange])
             part_textin = np.array([traceSource.get_textin(t + tracerange[0]) for t in trange])
-            part_textout = np.array([traceSource.get_textout(t + tracerange[0]) for t in trange])
-            part_knownkey = np.array([traceSource.get_known_key(t + tracerange[0]) for t in trange])
+            if type(traceSource.get_textout(0)) == bytes:
+                part_textout = np.array([np.frombuffer(traceSource.get_textout(t + tracerange[0]), dtype=np.uint8) for t in trange])
+            else:
+                part_textout = np.array([traceSource.get_textout(t + tracerange[0]) for t in trange])
 
+            part_knownkey = np.array([traceSource.get_known_key(t + tracerange[0]) for t in trange])
             diff = cpa.calculate_correlation(part_trace, part_textin, part_textout, part_knownkey)
 
             for bnum in self.brange:
@@ -69,17 +81,32 @@ class FastCPAProgressive(AlgorithmsBase):
 
         del cpa
 
+class FastCPAProgressiveTiling(FastCPAProgressive):
+    def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_kernel import FastCPA
+        return FastCPA(byte_len, numpoints, model, True)
+
+
 class FastCPAProgressiveCuda(FastCPAProgressive):
     def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_kernel import FastCPA
         from .cpa_cuda_kernel import FastCPACuda
         return FastCPACuda(byte_len, numpoints, model)
 
+class FastCPAProgressiveCudaFP32(FastCPAProgressive):
+    def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_kernel import FastCPA
+        from .cpa_cuda_kernel import FastCPACudaFP32
+        return FastCPACudaFP32(byte_len, numpoints, model)
+
 class FastCPAProgressiveOpenCL(FastCPAProgressive):
     def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_kernel import FastCPA
         from .cpa_opencl_kernel import FastCPAOpenCL
         return FastCPAOpenCL(byte_len, numpoints, model)
 
 class FastCPAProgressiveOpenCLFP32(FastCPAProgressive):
     def getCpaKernel(self, byte_len, numpoints, model):
+        from .cpa_kernel import FastCPA
         from .cpa_opencl_kernel import FastCPAOpenCLFP32
         return FastCPAOpenCLFP32(byte_len, numpoints, model)

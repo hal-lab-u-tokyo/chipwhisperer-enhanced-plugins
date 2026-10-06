@@ -5,34 +5,54 @@
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  13-07-2024 16:20:31
-#   Last Modified: 17-07-2024 22:23:47
+#   Last Modified: 15-11-2025 15:23:18
 ###
 
 from .SakuraXShell import SakuraXShellControlBase
+from .utils import vivado_parse_memmap, ParseError, MemoryMap
+
+import warnings
 from elftools.elf.elffile import ELFFile
 from collections import namedtuple
 import numpy as np
 from abc import ABCMeta
+from pathlib import Path
 
 class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
     Segment = namedtuple("Segment", ["offset", "size", "binary_size", "data"])
 
     # Peripheral address
-    RECV_BUF_DATA_ADDR = 0xA2000000
-    RECV_BUF_STAT_ADDR = 0xA2000004
-    SEND_BUF_DATA_ADDR = 0xA2000008
-    SEND_BUF_STAT_ADDR = 0xA200000C
+    RECV_BUF_DATA_ADDR = 0x0
+    RECV_BUF_STAT_ADDR = 0x4
+    SEND_BUF_DATA_ADDR = 0x8
+    SEND_BUF_STAT_ADDR = 0xC
+
+    # def get_periph_address(self, name):
+    #     return self.periph_address_base + self.periph_address_offset[name]
 
     CHUNK_SIZE = 16
 
-    def __init__(self, ser, program, control_address=0x4000_0000, verbose = False):
+    def __init__(self, ser, program, hwh_file = None, verbose = False):
         super().__init__(ser)
         self.debug_print = lambda x: print("[INFO]", x) if verbose else lambda x: None
         # system reset
         self.reset_command()
         self.segments = []
         self.loadProgram(program)
-        self.control_address = control_address
+
+        # use default address map
+        self.control_address = 0x4000_0000
+        self.memmap_core = MemoryMap()
+        self.memmap_core.add_range("axi_buffer_0", 0xA200_0000, 0xA200_FFFF)
+
+        if not hwh_file is None:
+            try:
+                memmap_ctrl = vivado_parse_memmap(hwh_file, "/controller_AXI_0")
+                memmap_core = vivado_parse_memmap(hwh_file, "/VexRiscv_Core_0")
+                self.control_address = memmap_ctrl.VexRiscv_Core_0.base
+                self.memmap_core = memmap_core
+            except (AttributeError, ParseError, FileNotFoundError) as E:
+                warnings.warn("Error loading hardware handoff file: " + E.args[0] + ". Using default address map." )
 
         # core reset
         self.core_start()
@@ -99,46 +119,66 @@ class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
 
     def flush(self):
         super().flush()
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.RECV_BUF_DATA_ADDR
         while not self.is_recv_buffer_empty():
-            _ = self.read_data(self.RECV_BUF_DATA_ADDR, 1)[0]
+            _ = self.read_data(addr, 1)[0]
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.SEND_BUF_DATA_ADDR
         while not self.is_send_buffer_empty():
-            _ = self.read_data(self.SEND_BUF_DATA_ADDR, 1)[0]
+            _ = self.read_data(addr, 1)[0]
 
     # buffer control
     def is_send_buffer_full(self):
-        return self.read_data(self.SEND_BUF_STAT_ADDR, 1)[0] & 0xFF00 == 1
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.SEND_BUF_STAT_ADDR
+        return self.read_data(addr, 1)[0] & 0xFF00 == 1
 
     def is_send_buffer_empty(self):
-        return self.read_data(self.SEND_BUF_STAT_ADDR, 1)[0] & 0xFF == 1
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.SEND_BUF_STAT_ADDR
+        return self.read_data(addr, 1)[0] & 0xFF == 1
 
     def is_recv_buffer_full(self):
-        return self.read_data(self.RECV_BUF_STAT_ADDR, 1)[0] & 0xFF00 == 1
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.RECV_BUF_STAT_ADDR
+        return self.read_data(addr, 1)[0] & 0xFF00 == 1
 
     def is_recv_buffer_empty(self):
-        return self.read_data(self.RECV_BUF_STAT_ADDR, 1)[0] & 0xFF == 1
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.RECV_BUF_STAT_ADDR
+        return self.read_data(addr, 1)[0] & 0xFF == 1
 
     def get_send_buffer_bytes(self):
-        stat = self.read_data(self.SEND_BUF_STAT_ADDR, 1)[0]
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.SEND_BUF_STAT_ADDR
+        stat = self.read_data(addr, 1)[0]
         return (stat & 0xFFFF0000) >> 16
 
     def get_recv_buffer_bytes(self):
-        stat = self.read_data(self.RECV_BUF_STAT_ADDR, 1)[0]
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.RECV_BUF_STAT_ADDR
+        stat = self.read_data(addr, 1)[0]
         return (stat & 0xFFFF0000) >> 16
 
     def send_bytes(self, data):
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.SEND_BUF_DATA_ADDR
         for b in data:
             # wait until send buffer is not full
             while self.is_send_buffer_full():
                 pass
-            self.write_data(self.SEND_BUF_DATA_ADDR, [b])
+            self.write_data(addr, [b])
 
     def recv_bytes(self, length):
         data = bytearray()
+        addr = self.memmap_core.axi_buffer_0.base + \
+                self.RECV_BUF_DATA_ADDR
         for i in range(length):
             # wait until recv buffer is not empty
             while self.is_recv_buffer_empty():
                 pass
-            data.append(self.read_data(self.RECV_BUF_DATA_ADDR, 1)[0])
+            data.append(self.read_data(addr, 1)[0])
         return bytes(data)
 
     def send_key(self, key : bytes):

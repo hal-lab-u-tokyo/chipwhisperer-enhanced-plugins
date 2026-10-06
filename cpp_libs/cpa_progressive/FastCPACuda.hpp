@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:56:58
-*    Last Modified: 17-02-2024 22:09:19
+*    Last Modified: 23-05-2025 12:09:43
 */
 
 #ifndef FASTCPACUDA_H
@@ -29,11 +29,11 @@
 }
 
 
-class FastCPACuda : public FastCPA
+class FastCPACudaBase : public FastCPA
 {
 public:
-	FastCPACuda(int num_traces, int num_points, AESLeakageModel::ModelBase *model);
-	~FastCPACuda();
+	FastCPACudaBase(int num_traces, int num_points, AESLeakageModel::ModelBase *model);
+	~FastCPACudaBase();
 
 protected:
 	// device arrays
@@ -48,14 +48,33 @@ protected:
 	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,
 						py::array_t<uint8_t> &py_plaintext,
 						py::array_t<uint8_t> &py_ciphertext,
-						py::array_t<uint8_t> &py_knownkey);
+						py::array_t<uint8_t> &py_knownkey) = 0;
 	virtual void calculate_hypothesis();
 	virtual void calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2);
 	virtual void calclualte_sumden2(QUADFLOAT *sumden2) {
 		FastCPA::calclualte_sumden2(sumden2);
 	};
+	virtual void run_sum_hypothesis_trace_kernel() = 0;
 
 };
+
+class FastCPACuda : public FastCPACudaBase
+{
+public:
+	FastCPACuda(int num_traces, int num_points, AESLeakageModel::ModelBase *model) :
+				FastCPACudaBase(num_traces, num_points, model) {};
+	~FastCPACuda() {};
+protected:
+	// overrided functions
+	virtual void setup_arrays(py::array_t<TRACE_T> &py_traces,
+						py::array_t<uint8_t> &py_plaintext,
+						py::array_t<uint8_t> &py_ciphertext,
+						py::array_t<uint8_t> &py_knownkey);
+
+	virtual void run_sum_hypothesis_trace_kernel();
+
+};
+
 
 
 #endif //FASTCPACUDA_H

@@ -5,7 +5,7 @@
 *    Project:       sca_toolbox
 *    Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 *    Created Date:  23-01-2024 16:57:38
-*    Last Modified: 07-05-2024 12:00:11
+*    Last Modified: 30-05-2025 09:35:01
 */
 
 
@@ -22,10 +22,12 @@
 #endif
 
 #include <iostream>
-#include <chrono>
+#include <cmath>
 
 namespace py = pybind11;
 using namespace std;
+
+#define LOCAL_SAMPLE_SIZE (1 * 1024 * 1024) // 1 MiB
 
 py::array_t<RESULT_T> FastCPA::calculate_correlation(py::array_t<TRACE_T> &py_traces,
 											py::array_t<uint8_t> &py_plaintext,
@@ -45,7 +47,20 @@ py::array_t<RESULT_T> FastCPA::calculate_correlation(py::array_t<TRACE_T> &py_tr
 	py::array_t<RESULT_T> py_diff({byte_length, NUM_GUESSES, num_points});
 	Array3D<RESULT_T>* diff = new Array3D<RESULT_T>((RESULT_T*)py_diff.request().ptr,
 											byte_length, NUM_GUESSES, num_points);
-	calculate_correlation_subkey(diff, sumden2);
+	if (enable_tiling) {
+		// set tile size
+		point_tile_size = num_points;
+		point_tile_size = 1 << int(ceil(log2(num_points)));
+		while ((sizeof(TRACE_T) * point_tile_size * num_traces) > LOCAL_SAMPLE_SIZE) {
+			point_tile_size /= 2;
+			if (point_tile_size < 64) {
+				break;
+			}
+		}
+		calculate_correlation_subkey_tiling(diff, sumden2);
+	} else {
+		calculate_correlation_subkey(diff, sumden2);
+	}
 
 	delete[] sumden2;
 
@@ -91,7 +106,6 @@ void FastCPA::update_sum_trace() {
 	#endif
 	for (int p = 0; p < num_points; p++) {
 		for (int t = 0; t < num_traces; t++) {
-			QUADFLOAT prev = sum_trace[p];
 			sum_trace[p] += traces->at(t, p);
 			sum_trace_square[p] += SQUARE(traces->at(t, p));
 		}
@@ -109,7 +123,6 @@ void FastCPA::calclualte_sumden2(QUADFLOAT *sumden2) {
 #else
 		sumden2[p] = std::fma(- (QUADFLOAT)total_traces, sum_trace_square[p], SQUARE(sum_trace[p]));
 #endif
-
 	}
 }
 
@@ -141,9 +154,10 @@ void FastCPA::calculate_hypothesis() {
 void FastCPA::calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2) {
 
 	QUADFLOAT sumden1;
-	// loop for each byte
+
+
 	#ifdef _OPENMP
-	#pragma omp parallel for collapse(2) private(sumden1)
+	#pragma omp parallel for collapse(2) private(sumden1) schedule(dynamic)
 	#endif
 	for (int guess = 0; guess < NUM_GUESSES; guess++) {
 		for (int byte_index = 0; byte_index < byte_length; byte_index++) {
@@ -151,7 +165,6 @@ void FastCPA::calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *s
 				auto hyp = hypothetial_leakage->at(byte_index, guess, t);
 				sum_hypothesis->at(byte_index, guess) += hyp;
 				sum_hypothesis_square->at(byte_index, guess) += SQUARE(hyp);
-				// sum up hypothesis * trace
 				for (int p = 0; p < num_points; p++) {
 					sum_hypothesis_trace->at(byte_index, guess, p)
 						+= hyp * traces->at(t, p);
@@ -168,6 +181,51 @@ void FastCPA::calculate_correlation_subkey(Array3D<RESULT_T>* diff, QUADFLOAT *s
 					- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
 
 				diff->at(byte_index, guess, p) = (RESULT_T)sumnum / std::sqrt((RESULT_T)sumden1 * (RESULT_T)sumden2[p]);
+			}
+
+		}
+	}
+
+}
+
+void FastCPA::calculate_correlation_subkey_tiling(Array3D<RESULT_T>* diff, QUADFLOAT *sumden2) {
+
+	QUADFLOAT sumden1;
+
+
+	#ifdef _OPENMP
+	#pragma omp parallel for collapse(2) private(sumden1) schedule(dynamic)
+	#endif
+	for (int guess = 0; guess < NUM_GUESSES; guess++) {
+		for (int byte_index = 0; byte_index < byte_length; byte_index++) {
+			for (int t = 0; t < num_traces; t++) {
+				auto hyp = hypothetial_leakage->at(byte_index, guess, t);
+				sum_hypothesis->at(byte_index, guess) += hyp;
+				sum_hypothesis_square->at(byte_index, guess) += SQUARE(hyp);
+			}
+
+			for (int tp = 0; tp < num_points; tp += point_tile_size) {
+				int end_point = std::min(tp + point_tile_size, num_points);
+				for (int t = 0; t < num_traces; t++) {
+					// sum up hypothesis * trace
+					auto hyp = hypothetial_leakage->at(byte_index, guess, t);
+					for (int p = tp; p < end_point; p++) {
+						sum_hypothesis_trace->at(byte_index, guess, p)
+							+= hyp * traces->at(t, p);
+					}
+				}
+
+				// calc sumden1
+				sumden1 = SQUARE(sum_hypothesis->at(byte_index, guess))
+				- total_traces * sum_hypothesis_square->at(byte_index, guess);
+
+				// calc sumnum
+				for (int p = tp; p < end_point; p++) {
+					QUADFLOAT sumnum = (QUADFLOAT)total_traces * sum_hypothesis_trace->at(byte_index, guess, p)
+						- sum_trace[p] * sum_hypothesis->at(byte_index, guess);
+
+					diff->at(byte_index, guess, p) = (RESULT_T)sumnum / std::sqrt((RESULT_T)sumden1 * (RESULT_T)sumden2[p]);
+				}
 			}
 		}
 	}

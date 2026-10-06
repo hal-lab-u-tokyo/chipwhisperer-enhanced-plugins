@@ -1,32 +1,33 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 LABEL maintener="Takuya Kojima <tkojima@hal.ipc.i.u-tokyo.ac.jp>"
 
 ENV JUPYTER_PORT=8888
 ENV NOTEBOOK_TOKEN=chipwhisperer
 
-RUN apt update && apt install -y wget gnupg2 ca-certificates 
-RUN mkdir --parents --mode=0755 /etc/apt/keyrings && \
-	wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | \
-	gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
-	echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu jammy/production/2328 unified" | \
-  	tee /etc/apt/sources.list.d/intel-gpu-jammy.list
-
-RUN apt update && apt install -y \
+RUN apt update && apt install -y software-properties-common && \
+	add-apt-repository -y ppa:kobuk-team/intel-graphics && \
+	apt install -y \
 	build-essential \
 	cmake \
 	git \
 	python3-dev \
 	python3-pip \
+	python3-venv \
 	intel-opencl-icd \
 	ocl-icd-opencl-dev \
 	opencl-headers \
 	&& rm -rf /var/lib/apt/lists/*
 
 
+# create venv
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+
 # pull chipwhisperer and install
 RUN cd /opt && git clone https://github.com/newaetech/chipwhisperer.git && \
-	cd chipwhisperer && git checkout 5.7.0 && \
+	cd chipwhisperer && git checkout v6.0.0b && \
 	git submodule update --init jupyter && \
 	pip3 install . && \
 	pip3 install -r jupyter/requirements.txt
@@ -41,7 +42,15 @@ RUN cd /opt/chipwhisperer-enhanced-plugins && \
 RUN mkdir -p /workspace/notebooks && mkdir /workspace/data
 WORKDIR /workspace
 
+# trick for non-root user setup script
+RUN mkdir /var/tmp/init && chmod o+w /var/tmp/init
+RUN { \
+  echo 'if [ -f "/var/tmp/init/${UID}_bashrc" ]; then'; \
+  echo '  source /var/tmp/init/${UID}_bashrc'; \
+  echo 'fi'; \
+} >> /etc/bash.bashrc
+
 # add entrypoint
-ADD ./docker/launch_notebook.sh /usr/local/bin/launch_notebook.sh
-RUN chmod +x /usr/local/bin/launch_notebook.sh
-CMD [ "/usr/local/bin/launch_notebook.sh"]
+ADD ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

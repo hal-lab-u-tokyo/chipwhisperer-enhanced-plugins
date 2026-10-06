@@ -14,7 +14,12 @@ This repository provides enhanced plugins for the [Chipwhisperer](https://github
 
 Technical details of the plugins are also described in the following paper:
 
-Takuya Kojima, Masaki Morita, Hideki Takase, and Hiroshi Nakamura, "An Open-Source Framework for Efficient Side-Channel Analysis on Cryptographic Implementations", Cryptology ePrint Archive, Report 2025/1130 (a preprint version of the paper, https://eprint.iacr.org/2025/1130)
+```
+Takuya Kojima, Masaki Morita, Hideki Takase, and Hiroshi Nakamura, "An Open-Source Framework for Efficient Side-Channel Analysis on Cryptographic Implementations", IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems (TCAD). DOI: 10.1109/TCAD.2026.3654878. 
+```
+
+We hope that those who use this repository for their research will cite this paper in their publications.
+
 
 ## Extended features
 ### Supported hardware platforms
@@ -31,6 +36,7 @@ Takuya Kojima, Masaki Morita, Hideki Takase, and Hiroshi Nakamura, "An Open-Sour
 * VISA compatible oscilloscopes
   * Keysight Infiniviion 40000 (MSO-X 4101A tested)
   * Rigol MSO8000 (MSO8104 tested)
+  
 You can integrate your own VISA-compatible oscilloscopes by creating a custom class that inherits from the provided base class.
 
 ### Analysis algorithms
@@ -56,6 +62,11 @@ If you have already cloned the repository without the `--recursive` flag, you ca
 git submodule update --init --recursive
 ```
 
+## Versioning
+
+This project follows the version of ChipWhisperer for which compatibility has been verified.
+
+
 ## Directory structure
 * lib: python library source
 * hardware: target hardware related files and submodules
@@ -67,6 +78,11 @@ git submodule update --init --recursive
 
 ## Getting Started
 See the Setup Guide of [documentation](./docs/README.md) for instructions on how to set up the environment and run the analysis.
+
+## Code Samples
+* [Trace acquisition](./notebooks/acquire_traces_code.ipynb)
+* [GUI-based acquisition of traces with a ChipWhisperer scope](./notebooks/acquire_traces_cw_scope.ipynb)
+* [GUI-based acquisition of traces with a VISA oscilloscope](./notebooks/acquire_traces_with_visa_scope.ipynb)
 
 ## Tutorials
 * [Tutorial 1: 1st-order CPA on DPA Contest V2 dataset](./notebooks/tutorial_cpa.ipynb)

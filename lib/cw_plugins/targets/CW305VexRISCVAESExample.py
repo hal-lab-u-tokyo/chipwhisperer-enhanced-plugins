@@ -1,3 +1,16 @@
+###
+#   Copyright (C) 2026 The University of Tokyo
+#   
+#   File:          /CW305VexRISCVAESExample.py
+#   Project:       targets
+#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
+#   Created Date:  05-08-2026 09:58:23
+#   Last Modified: 05-08-2026 10:07:25
+###
+
+
+from pathlib import Path
+
 from .CW305VexRISCV import CW305VexRISCVBase
 import os
 from Crypto.Cipher import AES
@@ -6,7 +19,7 @@ import numpy as np
 UNMASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/cw305/aes_unmasked.elf")
 MASKED_PROGRAM = os.path.join(os.path.dirname(__file__), "aes_soft/cw305/aes_masked.elf")
 
-class CW305RISCVAES128bit(CW305VexRISCVBase):
+class CW305VexRISCVAESExample(CW305VexRISCVBase):
     CMD_SET_KEY 		= 0x11
     CMD_SET_PLAINTEXT	= 0x12
     CMD_ENCRYPT			= 0x13
@@ -26,6 +39,16 @@ class CW305RISCVAES128bit(CW305VexRISCVBase):
         else:
             print("Unprotected AES program is selected")
             self.program = UNMASKED_PROGRAM
+
+        use_prebuilt_bitstream = False
+        name_base = "VexRiscv"
+        if "bsfile" not in kwargs:
+            kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / "cw305" / name_base).with_suffix(".bit")
+            use_prebuilt_bitstream = True
+
+        if "hwh_file" not in kwargs and use_prebuilt_bitstream:
+            kwargs["hwh_file"] = (Path(__file__).parent / "hwh_files" / "cw305" / name_base).with_suffix(".hwh")
+        
         super()._con(scope, program = self.program, **kwargs)
 
 

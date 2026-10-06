@@ -8,7 +8,7 @@ However, this can be slow for large datasets (i.e., many traces or many points p
 since it is fully implemented in Python and cannot leverage multi-threading or GPU acceleration.
 
 ```python
-import chipwhisper as cw
+import chipwhisperer as cw
 import chipwhisperer.analyzer as cwa
 from chipwhisperer.analyzer.attacks import cpa_algorithms
 
@@ -58,6 +58,9 @@ However, we limit the precision-sensitive operations to the final correlation co
 However, some CPU architectures, such as Apple Silicon CPUs, do not support the extended precision floating-point type.
 In such cases, we utilize a quad-precision floating-point emulation technique to ensure compatibility.
 It is automatically applied when building the library on such architectures with cmake.
+
+### CUDA device selection
+If you have multiple CUDA devices, you can specify the device to use by setting the `CUDA_VISIBLE_DEVICES` environment variable.
 
 ### OpenCL device selection
 If you have multiple OpenCL devices, you can specify the device to use by setting the `CL_PLATFORM` and `CL_DEVICE` environment variables.

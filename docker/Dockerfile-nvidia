@@ -1,6 +1,6 @@
-FROM nvidia/cuda:12.8.1-devel-ubuntu24.04
+FROM nvidia/cuda:13.3.1-devel-ubuntu24.04
 
-LABEL maintener="Takuya Kojima <tkojima@hal.ipc.i.u-tokyo.ac.jp>"
+LABEL maintener="Takuya Kojima <tkojima@lila.cs.tsukuba.ac.jp>"
 
 ENV JUPYTER_PORT=8888
 ENV NOTEBOOK_TOKEN=chipwhisperer
@@ -24,7 +24,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # pull chipwhisperer and install
 RUN cd /opt && git clone https://github.com/newaetech/chipwhisperer.git && \
-	cd chipwhisperer && git checkout 5.7.0 && \
+	cd chipwhisperer && git checkout v6.0.0b && \
 	git submodule update --init jupyter && \
 	pip3 install . && \
 	pip3 install -r jupyter/requirements.txt

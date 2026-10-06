@@ -1,7 +1,10 @@
 name: Build & Test for Linux
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
+      - "compat/**"
+
   pull_request:
     branches: [ master ]
 
@@ -26,7 +29,7 @@ jobs:
           pip3 install pybind11
           sudo apt-get update
           sudo apt-get install cmake
-          git clone https://github.com/newaetech/chipwhisperer.git -b 5.7.0
+          git clone https://github.com/newaetech/chipwhisperer.git -b v6.0.0b
           cd chipwhisperer
           pip3 install .
 

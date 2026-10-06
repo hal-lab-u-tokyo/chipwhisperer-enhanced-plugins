@@ -9,7 +9,7 @@ Therefore, we also provide a small size version of the dataset, which is a subse
 - **Target**:  32-bit RISC-V processor with AES-128 implementation
   - **Board**: CW305
   - **Hardware Design**: [VexRiscv_SCA](https://github.com/hal-lab-u-tokyo/VexRiscv_SCA)
-  - **Python Target Class**: `CW305RISCVAES128bit` (See Also [API Usage example](../../docs/hardware.md#aes-example-on-vexriscv_sca))
+  - **Python Target Class**: `CW305VexRISCVAESExample` (See Also [API Usage example](../../docs/hardware.md#aes-example-on-vexriscv_sca))
   - **Masking Scheme**: Boolean masking
   - **Software code**: [aes_soft](../../lib//cw_plugins/targets/aes_soft)
   - **C Compiler**: clang 19.1.7
@@ -76,4 +76,17 @@ The reported sample positions are relative to the 3000th sample in the waveform.
       15      0x3C    (1026,1947)     0.02269         0
 ```
 
-**Note**: The attack was completed in 3681.78 seconds (about 1 hour) on a system featuring an Nvidia GeForce RTX 4090 GPU, a 64-core Ryzen Threadripper Pro 5995WX CPU, and 512 GB of RAM. (`SOCPAAlgorithmCudaFP32` was used for the attack.)
+### Needed time to analyze the dataset
+
+The second-order CPA can take substantial time even with the small dataset.
+The following examples use the attack settings described above.
+
+| CPU | GPU | RAM | Algorithm | Execution time (s) |
+| --- | --- | --- | --- | --- |
+ | Ryzen Threadripper PRO 9995WX | -- | 512 GB | `SOCPAAlgorithm` | 4395.899 |
+| Intel Core i9-14900KF | NVIDIA GeForce RTX 5090 | 128 GB | `SOCPAAlgorithmCudaFP32NoSM` | 1886.170 |
+| Intel Core i9-14900KF | NVIDIA GeForce RTX 5090 | 128 GB | `SOCPAAlgorithmCudaFP32` | 5563.395 |
+| Ryzen Threadripper PRO 7995WX | NVIDIA GeForce RTX 4090 | 512 GB | `SOCPAAlgorithmCudaFP32NoSM` | 7689.024 |
+| Ryzen Threadripper PRO 7995WX | NVIDIA GeForce RTX 4090 | 512 GB | `SOCPAAlgorithmCudaFP32` | 10308.244 |
+| Ryzen Threadripper PRO 5995WX | AMD Radeon RX 7900 XTX | 512 GB | `SOCPAAlgorithmOpenCLFP32NoSM` | 6647.106 |
+| Ryzen Threadripper PRO 5995WX | AMD Radeon RX 7900 XTX | 512 GB | `SOCPAAlgorithmOpenCLFP32` | 6094.311 |

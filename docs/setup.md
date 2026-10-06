@@ -8,11 +8,11 @@ Please refer to the [macOS Installation Guide](#installation-script-on-macos) se
 # Prerequisites for Linux
 This framework needs [Chipwhisperer](https://github.com/newaetech/chipwhisperer) as a core componet.
 Please install it first acording to the official documentation.
-Currently, we tested this framework with Chipwhisperer 5.7.0.
+Currently, we tested this framework with Chipwhisperer version 6.0.0.
 At least, the following commands are required to install Chipwhisperer and its Jupyter Notebook environment.
 
 ```
-git clone --recursive https://github.com/newaetech/chipwhisperer.git -b 5.7.0
+git clone --recursive https://github.com/newaetech/chipwhisperer.git -b v6.0.0b
 cd chipwhisperer
 pip3 install .
 pip3 install -r jupyter/requirements.txt
@@ -127,7 +127,7 @@ This is a pure Python implementation of the VISA interface, which can be used as
 pip3 install pyvisa-py
 ```
 
-## Installing udev rules
+## Installing udev rules (Linux only)
 Please copy the rules file from this repository or modify it to match the device you are using. 'lsusb' command is useful for checking the Vendor ID and Product ID.
 
 ```
@@ -138,3 +138,28 @@ sudo cp udev-rules/99-keysight-oscilloscope.rules /etc/udev/rules.d/
 # for rigol MSO8104A
 sudo cp udev-rules/99-rigol-oscilloscope.rules /etc/udev/rules.d/
 ```
+
+Reload the rules, then disconnect and reconnect the USB device:
+
+```sh
+sudo udevadm control --reload-rules
+```
+
+The SAKURA-X rule requires the `SAKURA-X Shell` USB product string from
+[`sakura-x-shell.xml`](../hardware/sakura-x-shell/ft2232h_config/sakura-x-shell.xml).
+See the [FT2232H configuration guide](../hardware/sakura-x-shell/doc/ft2232h_config.md)
+for programming instructions. For a board with USB serial number `FT7A1234`,
+the rule creates these symlinks:
+
+| Device path | USB interface | Purpose |
+| --- | --- | --- |
+| `/dev/sakura-x-shell/FT7A1234/data` | `00` (Channel A) | Shell communication |
+| `/dev/sakura-x-shell/FT7A1234/reset` | `01` (Channel B) | Reserved for reset control |
+
+Each board uses its own serial-number directory, independent of its
+`ttyUSB` numbers. The driver discovers these pairs automatically, or accepts the paths as
+`data_port` and `reset_port`. With multiple boards, select one using
+`serial_number`. Hardware reset requires an FPGA controller design with
+Channel B RTS# connected to its reset logic.
+Devices retaining the original generic product string are no longer matched
+by this rule; their access permissions must be configured separately.

@@ -1,11 +1,11 @@
 ###
 #   Copyright (C) 2025 The University of Tokyo
 #   
-#   File:          /lib/cw_plugins/targets/CW305ShellAESExamples.py
+#   File:          /CW305ShellAESExamples.py
 #   Project:       sca_toolbox
 #   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
 #   Created Date:  25-01-2025 15:16:34
-#   Last Modified: 15-03-2025 06:40:44
+#   Last Modified: 31-07-2026 07:16:19
 ###
 
 
@@ -85,11 +85,11 @@ class CW305ShellExampleAES128BitRTL(CW305ShellAES128BitBase):
 
         use_prebuilt_bitstream = False
         if "bsfile" not in kwargs:
-            kwargs["bsfile"] = Path(__file__).parent / "bitstreams" / "cw305" / name_base + ".bit"
+            kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / "cw305" / name_base).with_suffix(".bit")
             use_prebuilt_bitstream = True
 
         if "hwh_file" not in kwargs and use_prebuilt_bitstream:
-            kwargs["hwh_file"] = Path(__file__).parent / "hwh_files" / "cw305" / name_base + ".hwh"
+            kwargs["hwh_file"] = (Path(__file__).parent / "hwh_files" / "cw305" / name_base).with_suffix(".hwh")
 
         super()._con(scope, **kwargs)
         try:
@@ -204,11 +204,11 @@ class CW305ShellExampleAES128BitHLS(CW305ShellAES128BitBase):
 
         use_prebuilt_bitstream = False
         if "bsfile" not in kwargs:
-            kwargs["bsfile"] = Path(__file__).parent / "bitstreams" / "cw305" / f"{name_base}.bit"
+            kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / "cw305" / f"{name_base}").with_suffix(".bit")
             use_prebuilt_bitstream = True
 
         if "hwh_file" not in kwargs and use_prebuilt_bitstream:
-            kwargs["hwh_file"] = Path(__file__).parent / "hwh_files" / "cw305" / f"{name_base}.hwh"
+            kwargs["hwh_file"] = (Path(__file__).parent / "hwh_files" / "cw305" / f"{name_base}").with_suffix(".hwh")
 
 
         super()._con(scope, **kwargs)

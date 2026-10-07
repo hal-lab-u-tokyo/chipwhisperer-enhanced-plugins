@@ -2,7 +2,6 @@
 
 from cw_plugins.scopes.base import ScopeBase, TriggerMode
 import math
-from numbers import Real
 import numpy as np
 import pypicosdk as psdk
 
@@ -44,28 +43,17 @@ class PicoScope3000E(ScopeBase):
         20.0 / 4: psdk.RANGE.V20,
     }
 
-    def _channel_voltage_settings(self, scale, offset, voltage_range, default_range):
-        if scale is not None:
-            if isinstance(scale, bool) or not isinstance(scale, Real):
-                raise ValueError(
-                    f"Unsupported scale {scale!r}; supported V/div values: {list(self.scale_map)}"
-                )
-            if voltage_range is not None:
-                raise ValueError("Specify either scale or voltage_range, not both")
-            for supported_scale, supported_range in self.scale_map.items():
-                if math.isclose(scale, supported_scale, rel_tol=1e-12, abs_tol=0):
-                    voltage_range = supported_range
-                    break
-            else:
-                raise ValueError(
-                    f"Unsupported scale {scale!r}; supported V/div values: {list(self.scale_map)}"
-                )
-        elif voltage_range is None:
-            voltage_range = default_range
-        if offset is None:
-            offset = 0.0
-        if isinstance(offset, bool) or not isinstance(offset, Real) or not math.isfinite(offset):
-            raise ValueError("offset must be a finite voltage in V")
+    def _channel_voltage_settings(self, scale, offset):
+        scale = self.decode_voltage(scale)
+        offset = self.decode_voltage(offset)
+        for supported_scale, supported_range in self.scale_map.items():
+            if math.isclose(scale, supported_scale, rel_tol=1e-12, abs_tol=0):
+                voltage_range = supported_range
+                break
+        else:
+            raise ValueError(
+                f"Unsupported scale {scale!r}; supported V/div values: {list(self.scale_map)}"
+            )
         # The shared offset is the input voltage at the range center.
         # PicoSDK instead specifies the voltage added before digitization.
         return voltage_range, -float(offset)
@@ -159,15 +147,22 @@ class PicoScope3000E(ScopeBase):
         channel,
         scale,
         offset,
-        threshold_mv=50,
+        threshold=None,
         # Optional parameters for PicoScope configuration
         coupling="DC",
     ):
+        """Set a GND-referenced threshold in V, accepting voltage strings.
+
+        None selects one division above the range center (offset + scale).
+        """
         if channel not in self.channel_map:
             raise ValueError(f"Channel {channel} is out of range")
 
-        voltage_range, analog_offset = self._channel_voltage_settings(
-            scale, offset, voltage_range, psdk.RANGE.mV500)
+        scale = self.decode_voltage(scale)
+        offset = self.decode_voltage(offset)
+        threshold = self.decode_voltage(offset + scale if threshold is None else threshold)
+        voltage_range, analog_offset = self._channel_voltage_settings(scale, offset)
+        direction = self.slope_map[mode]
 
         pico_ch = self.channel_map[channel]
         self.trigger_channel = pico_ch
@@ -181,8 +176,8 @@ class PicoScope3000E(ScopeBase):
 
         self.scope.set_simple_trigger(
             channel=pico_ch,
-            threshold=threshold_mv,
-            direction=self.slope_map[mode],
+            threshold=threshold * 1000,
+            direction=direction,
             delay=0,
         )
 
@@ -204,13 +199,12 @@ class PicoScope3000E(ScopeBase):
         Sample conversion is deferred until arm(), using the actual rate.
         scale is V/div for eight divisions and must match a supported range
         peak divided by four. offset is the range center voltage in V.
-        Specify either scale or voltage_range; the default range is ±20 mV.
+        scale and offset also accept voltage strings.
         """
         if channel not in self.channel_map:
             raise ValueError(f"Channel {channel} is out of range")
 
-        voltage_range, analog_offset = self._channel_voltage_settings(
-            scale, offset, voltage_range, psdk.RANGE.mV20)
+        voltage_range, analog_offset = self._channel_voltage_settings(scale, offset)
 
         duration = self.decode_time(period)
         start = self.decode_time(delay, allow_percent=True)

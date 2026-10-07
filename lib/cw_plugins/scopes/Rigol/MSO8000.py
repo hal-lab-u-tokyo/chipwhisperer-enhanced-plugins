@@ -47,6 +47,7 @@ class MSO8000(ScopeBase):
         return float(self.query(":ACQuire:SRATe?"))
 
     def set_sampling_rate(self, rate):
+        rate = self.decode_sampling_rate(rate)
         if rate <= 0 or rate > self.max_sampling_rate:
             raise ValueError(f"Sampling rate {rate} is out of range")
 

@@ -122,6 +122,7 @@ class PicoScope3000E(ScopeBase):
         return self._sampling_rate
 
     def set_sampling_rate(self, rate):
+        rate = self.decode_sampling_rate(rate)
         if rate <= 0:
             raise ValueError(f"Sampling rate {rate} is invalid")
 

@@ -22,7 +22,7 @@ try:
     )
     scope.config_trace_channel(
         "A", coupling="AC", voltage_range=psdk.RANGE.mV20,
-        samples=3000, pre_trig_percent=50,
+        period="3000samples", delay="-50%",
     )
     actual_rate = scope.set_sampling_rate(1.25e9)
 
@@ -42,10 +42,14 @@ finally:
 
 Channels use the strings `"A"`, `"B"`, `"C"`, and `"D"`.
 Select the input range with `voltage_range`, coupling with `"AC"` or `"DC"`, and the trigger threshold in millivolts with `threshold_mv`.
-The shared API's `scale`, `offset`, `delay`, and `impedance` arguments are currently unused by this wrapper.
+The shared API's `scale` and `offset` arguments are currently unused by this wrapper.
 
 Sampling rates are in samples per second. `set_sampling_rate()` returns the actual hardware rate, which can differ from the requested rate, and must be called before `arm()`.
-Trace length can be specified with `samples`, or with `period` in seconds after setting the sampling rate. `pre_trig_percent` selects the percentage of samples before the trigger (0–100).
+Specify trace length with `period`: a number in seconds, a time string such as `"10ns"`, or a count such as `"3000samples"`.
+`delay` is the capture start relative to the trigger. It accepts the same units, plus a percentage of the trace length: `"-50%"` selects half the trace before the trigger, and `"100samples"` starts 100 samples after the trigger.
+Positive delays capture the extra leading samples and trim them in `get_last_trace()` and `get_last_time_axis()`. Returned time coordinates remain relative to the trigger.
+Negative delays must not exceed the trace length. The default delay is zero.
+Window settings are converted using the actual sampling rate at `arm()`, so channels can be configured before the rate. Time and percentage specifications round to the nearest sample (ties to even); the resulting trace must contain at least one sample.
 
 Waveforms default to millivolts and the time axis defaults to nanoseconds.
 Set `scope.output_unit` to `"mv"`, `"v"`, or `"adc"` before acquisition to select millivolts, volts, or raw ADC counts.

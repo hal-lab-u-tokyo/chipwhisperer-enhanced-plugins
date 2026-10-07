@@ -2,8 +2,11 @@
 
 from cw_plugins.scopes.base import ScopeBase, TriggerMode
 import math
+import ctypes
+from numbers import Real
 import numpy as np
 import pypicosdk as psdk
+import time
 
 class PicoScope3000E(ScopeBase):
     """
@@ -28,20 +31,21 @@ class PicoScope3000E(ScopeBase):
         "DC": psdk.COUPLING.DC,
     }
 
-    # Eight vertical divisions: the bipolar range peak spans four divisions.
+    # Ten vertical divisions: the bipolar range peak spans five divisions.
     scale_map = {
-        0.010 / 4: psdk.RANGE.mV10,
-        0.020 / 4: psdk.RANGE.mV20,
-        0.050 / 4: psdk.RANGE.mV50,
-        0.100 / 4: psdk.RANGE.mV100,
-        0.200 / 4: psdk.RANGE.mV200,
-        0.500 / 4: psdk.RANGE.mV500,
-        1.0 / 4: psdk.RANGE.V1,
-        2.0 / 4: psdk.RANGE.V2,
-        5.0 / 4: psdk.RANGE.V5,
-        10.0 / 4: psdk.RANGE.V10,
-        20.0 / 4: psdk.RANGE.V20,
+        0.010 / 5: psdk.RANGE.mV10,
+        0.020 / 5: psdk.RANGE.mV20,
+        0.050 / 5: psdk.RANGE.mV50,
+        0.100 / 5: psdk.RANGE.mV100,
+        0.200 / 5: psdk.RANGE.mV200,
+        0.500 / 5: psdk.RANGE.mV500,
+        1.0 / 5: psdk.RANGE.V1,
+        2.0 / 5: psdk.RANGE.V2,
+        5.0 / 5: psdk.RANGE.V5,
+        10.0 / 5: psdk.RANGE.V10,
+        20.0 / 5: psdk.RANGE.V20,
     }
+    SAMPLING_RATE_REL_TOL = 0.01
 
     def _channel_voltage_settings(self, scale, offset):
         scale = self.decode_voltage(scale)
@@ -66,11 +70,12 @@ class PicoScope3000E(ScopeBase):
         self._closed = False
     
         self.scope = psdk.psospa()
-        self.scope.open_unit()
+        self.scope.open_unit(resolution=psdk.RESOLUTION._10BIT)
 
         # Default sampling rate. 
-        # The actual PicoScope timebase is configured only after set_sampling_rate() is called.
+        # The actual timebase is resolved when the trace channel is configured.
         self._sampling_rate = 1.25e9
+        self.requested_sampling_rate = None
         self.timebase = None
 
         self.samples = 3000
@@ -83,12 +88,14 @@ class PicoScope3000E(ScopeBase):
         self.trace_channel = psdk.CHANNEL.A
         self.trigger_channel = psdk.CHANNEL.B
 
-        self.output_unit = "mv"
+        self.output_unit = "v"
         self.time_unit = "ns"
 
         self.last_channel_buffer = None
         self.last_time_axis = None
         self.last_trace = None
+        self.last_raw_trace = None
+        self._adc_buffers = None
         
 
     def close(self):
@@ -122,23 +129,35 @@ class PicoScope3000E(ScopeBase):
         return self._sampling_rate
 
     def set_sampling_rate(self, rate):
+        """Store the requested rate for the next config_trace_channel()."""
         rate = self.decode_sampling_rate(rate)
-        if rate <= 0:
-            raise ValueError(f"Sampling rate {rate} is invalid")
-
         self.requested_sampling_rate = rate
+        self.timebase = None
 
-        self.timebase = self.scope.sample_rate_to_timebase(
+    def _configure_timebase(self):
+        """Resolve the timebase after the capture channels are enabled."""
+        rate = self.requested_sampling_rate
+        self.timebase = None
+        if rate is None:
+            raise RuntimeError("Call set_sampling_rate() before config_trace_channel().")
+
+        timebase = self.scope.sample_rate_to_timebase(
             sample_rate=rate / 1e9,
             unit=psdk.SAMPLE_RATE.GSPS,
         )
 
-        self._sampling_rate = self.scope.get_actual_sample_rate()
-        print(
-            f"PicoScope actual sampling rate set to "
-            f"{self._sampling_rate/1e9:.3f} GS/s "
-            f"(requested {rate/1e9:.3f} GS/s)"
-        )
+        actual_rate = self.scope.get_actual_sample_rate()
+        if (not math.isfinite(actual_rate) or actual_rate <= 0
+                or not math.isclose(actual_rate, rate,
+                                    rel_tol=self.SAMPLING_RATE_REL_TOL, abs_tol=0)):
+            raise RuntimeError(
+                f"PicoScope sampling rate differs from requested rate by more than "
+                f"{self.SAMPLING_RATE_REL_TOL:.0%}: requested {rate:g} S/s, "
+                f"actual {actual_rate:g} S/s"
+            )
+        self.timebase = timebase
+        self._sampling_rate = actual_rate
+
         return self._sampling_rate
 
     
@@ -151,28 +170,40 @@ class PicoScope3000E(ScopeBase):
         threshold=None,
         # Optional parameters for PicoScope configuration
         coupling="DC",
+        probe_scale=10.0,
     ):
         """Set a GND-referenced threshold in V, accepting voltage strings.
 
         None selects one division above the range center (offset + scale).
+        probe_scale is the probe attenuation (1 for 1:1, 10 for 10:1 (default)).
+        scale selects the input range as V/div over ten divisions, independently
+        of probe_scale. offset is the input range center voltage; threshold
+        refers to the probe tip and is scaled by the SDK.
         """
         if channel not in self.channel_map:
             raise ValueError(f"Channel {channel} is out of range")
 
+        if (isinstance(probe_scale, bool) or not isinstance(probe_scale, Real)
+                or not math.isfinite(probe_scale) or probe_scale < 1):
+            raise ValueError("probe_scale must be a finite attenuation factor >= 1")
+
         scale = self.decode_voltage(scale)
         offset = self.decode_voltage(offset)
         threshold = self.decode_voltage(offset + scale if threshold is None else threshold)
-        voltage_range, analog_offset = self._channel_voltage_settings(scale, offset)
+        voltage_range, analog_offset = self._channel_voltage_settings(
+            scale, offset)
         direction = self.slope_map[mode]
 
         pico_ch = self.channel_map[channel]
         self.trigger_channel = pico_ch
+        self._adc_buffers = None
 
         self.scope.set_channel(
             channel=pico_ch,
             coupling=self.coupling_map[coupling],
             range=voltage_range,
             offset=analog_offset,
+            probe_scale=probe_scale,
         )
 
         self.scope.set_simple_trigger(
@@ -198,8 +229,8 @@ class PicoScope3000E(ScopeBase):
         delay additionally accepts percentages of period; negative values
         select pre-trigger samples. Positive delays are captured and trimmed.
         Sample conversion is deferred until arm(), using the actual rate.
-        scale is V/div for eight divisions and must match a supported range
-        peak divided by four. offset is the range center voltage in V.
+        scale is V/div for ten divisions and must match a supported range
+        peak divided by five. offset is the range center voltage in V.
         scale and offset also accept voltage strings.
         """
         if channel not in self.channel_map:
@@ -226,6 +257,29 @@ class PicoScope3000E(ScopeBase):
 
         self._period = duration
         self._delay = start
+        self._configure_timebase()
+        self._adc_buffers = None
+        if coupling == "AC":
+            # Channel settings reach the hardware at RunBlock. Apply them
+            # once here, before real captures, and let AC coupling settle.
+            try:
+                self._run_block_capture(1, 0)
+                time.sleep(1)
+            except Exception:
+                self.timebase = None
+                raise
+            finally:
+                self.scope.stop()
+
+    def _run_block_capture(self, samples, pre_samples):
+        # psospaRunBlock expects uint64 sample counts and a double* for
+        # timeIndisposedMs. pyPicoSDK 1.7.5 passes an int32* for the latter.
+        # We do not need that estimate, so pass the documented NULL pointer.
+        self.scope._call_attr_function(
+            "RunBlock", self.scope.handle,
+            ctypes.c_uint64(pre_samples), ctypes.c_uint64(samples - pre_samples),
+            ctypes.c_uint32(self.timebase), None, ctypes.c_uint64(0), None, None,
+        )
 
     def _resolve_capture_window(self):
         # Round to the nearest sample, retaining the original units so rate
@@ -252,23 +306,19 @@ class PicoScope3000E(ScopeBase):
         if self.timebase is None:
             raise RuntimeError(
                 "PicoScope timebase is not configured. "
-                "Call set_sampling_rate() before arm()."
+                "Call set_sampling_rate() then config_trace_channel() before arm()."
                 )
         self._resolve_capture_window()
         self.last_trace = None
+        self.last_raw_trace = None
         self.last_time_axis = None
-        self.last_channel_buffer = self.scope.set_data_buffer_for_enabled_channels(
-            self._capture_samples
-        )
-
-        self.scope.run_block_capture(
-            timebase=self.timebase,
-            samples=self._capture_samples,
-            pre_trig_percent=self.pre_trig_percent,
-            segment=0,
-        )
-
-        # time.sleep(0.001)
+        if self._adc_buffers is None:
+            self._adc_buffers = self.scope.set_data_buffer_for_enabled_channels(
+                self._capture_samples
+            )
+        self.last_channel_buffer = self._adc_buffers
+        pre_samples = round(self._capture_samples * self.pre_trig_percent / 100)
+        self._run_block_capture(self._capture_samples, pre_samples)
 
     def capture(self, poll_done=False):
         if self.last_channel_buffer is None:
@@ -282,8 +332,14 @@ class PicoScope3000E(ScopeBase):
                 ratio_mode=psdk.RATIO_MODE.RAW,
             )
 
-            for ch in self.last_channel_buffer:
-                self.last_channel_buffer[ch] = self.last_channel_buffer[ch][:actual_samples]
+            # Keep driver-owned buffers registered across captures; return
+            # snapshots so the next acquisition cannot overwrite old traces.
+            self.last_channel_buffer = {
+                ch: buffer[:actual_samples].copy()
+                for ch, buffer in self._adc_buffers.items()
+            }
+
+            raw_trace = self.last_channel_buffer[self.trace_channel].copy()
 
             if self.output_unit == "mv":
                 self.last_channel_buffer = self.scope.adc_to_mv(
@@ -293,7 +349,7 @@ class PicoScope3000E(ScopeBase):
                 self.last_channel_buffer = self.scope.adc_to_volts(
                     self.last_channel_buffer
                 )
-            elif self.output_unit != "adc":
+            else:
                 raise ValueError(
                     f"Unsupported output unit: {self.output_unit}"
                 )
@@ -307,6 +363,7 @@ class PicoScope3000E(ScopeBase):
             )[:actual_samples]
             
             self.last_trace = self.last_channel_buffer[self.trace_channel]
+            self.last_raw_trace = raw_trace
             return False
 
         except Exception as e:
@@ -318,11 +375,16 @@ class PicoScope3000E(ScopeBase):
             return True
 
     def get_last_trace(self, as_int=False):
+        """Return raw ADC counts if as_int, otherwise voltage (default V).
+
+        Both representations preserve the same capture window. output_unit
+        selects v or mv for voltage output and does not affect raw counts.
+        """
         if self.last_trace is None:
             return None
 
         if as_int:
-            return np.asarray(self.last_trace)[self._trace_slice].astype(np.int16)
+            return self.last_raw_trace[self._trace_slice]
 
         return np.asarray(self.last_trace)[self._trace_slice]
 

@@ -70,7 +70,8 @@ class PicoScope3000E(ScopeBase):
         self._closed = False
     
         self.scope = psdk.psospa()
-        self.scope.open_unit(resolution=psdk.RESOLUTION._10BIT)
+        self.scope.open_unit()
+        self.resolution = None
 
         # Default sampling rate. 
         # The actual timebase is resolved when the trace channel is configured.
@@ -221,7 +222,8 @@ class PicoScope3000E(ScopeBase):
         period,
         delay=0,
         # Optional parameters for PicoScope configuration
-        coupling="AC"
+        coupling="AC",
+        resolution=10,
     ):
         """Set the capture window relative to the trigger.
 
@@ -232,9 +234,15 @@ class PicoScope3000E(ScopeBase):
         scale is V/div for ten divisions and must match a supported range
         peak divided by five. offset is the range center voltage in V.
         scale and offset also accept voltage strings.
+        resolution selects 8- or 10-bit acquisition (default 10) for the device.
+        Voltage output uses mV for ranges below +/-1 V, otherwise V;
+        output_unit records the selected unit. Raw ADC output is unaffected.
         """
         if channel not in self.channel_map:
             raise ValueError(f"Channel {channel} is out of range")
+
+        if isinstance(resolution, bool) or resolution not in (8, 10):
+            raise ValueError("resolution must be 8 or 10 bits")
 
         voltage_range, analog_offset = self._channel_voltage_settings(scale, offset)
 
@@ -244,6 +252,14 @@ class PicoScope3000E(ScopeBase):
             raise ValueError("period must be positive")
         if start[1] == "percent" and start[0] < -100:
             raise ValueError("delay cannot precede the capture window by more than period")
+
+        self.timebase = None
+        self._adc_buffers = None
+        self.last_channel_buffer = None
+        if resolution != self.resolution:
+            sdk_resolution = psdk.RESOLUTION._8BIT if resolution == 8 else psdk.RESOLUTION._10BIT
+            self.scope.set_device_resolution(sdk_resolution)
+            self.resolution = resolution
 
         pico_ch = self.channel_map[channel]
         self.trace_channel = pico_ch
@@ -258,6 +274,7 @@ class PicoScope3000E(ScopeBase):
         self._period = duration
         self._delay = start
         self._configure_timebase()
+        self.output_unit = "mv" if self.decode_voltage(scale) * 5 < 1 else "v"
         self._adc_buffers = None
         if coupling == "AC":
             # Channel settings reach the hardware at RunBlock. Apply them
@@ -375,10 +392,11 @@ class PicoScope3000E(ScopeBase):
             return True
 
     def get_last_trace(self, as_int=False):
-        """Return raw ADC counts if as_int, otherwise voltage (default V).
+        """Return raw ADC counts if as_int, otherwise voltage.
 
         Both representations preserve the same capture window. output_unit
-        selects v or mv for voltage output and does not affect raw counts.
+        records v or mv, selected from the configured trace range, and does
+        not affect raw counts.
         """
         if self.last_trace is None:
             return None

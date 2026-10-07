@@ -1,6 +1,8 @@
 # This code was made and tested based on 3418E.
 
 from cw_plugins.scopes.base import ScopeBase, TriggerMode
+import math
+from numbers import Real
 import numpy as np
 import pypicosdk as psdk
 
@@ -27,9 +29,50 @@ class PicoScope3000E(ScopeBase):
         "DC": psdk.COUPLING.DC,
     }
 
+    # Eight vertical divisions: the bipolar range peak spans four divisions.
+    scale_map = {
+        0.010 / 4: psdk.RANGE.mV10,
+        0.020 / 4: psdk.RANGE.mV20,
+        0.050 / 4: psdk.RANGE.mV50,
+        0.100 / 4: psdk.RANGE.mV100,
+        0.200 / 4: psdk.RANGE.mV200,
+        0.500 / 4: psdk.RANGE.mV500,
+        1.0 / 4: psdk.RANGE.V1,
+        2.0 / 4: psdk.RANGE.V2,
+        5.0 / 4: psdk.RANGE.V5,
+        10.0 / 4: psdk.RANGE.V10,
+        20.0 / 4: psdk.RANGE.V20,
+    }
+
+    def _channel_voltage_settings(self, scale, offset, voltage_range, default_range):
+        if scale is not None:
+            if isinstance(scale, bool) or not isinstance(scale, Real):
+                raise ValueError(
+                    f"Unsupported scale {scale!r}; supported V/div values: {list(self.scale_map)}"
+                )
+            if voltage_range is not None:
+                raise ValueError("Specify either scale or voltage_range, not both")
+            for supported_scale, supported_range in self.scale_map.items():
+                if math.isclose(scale, supported_scale, rel_tol=1e-12, abs_tol=0):
+                    voltage_range = supported_range
+                    break
+            else:
+                raise ValueError(
+                    f"Unsupported scale {scale!r}; supported V/div values: {list(self.scale_map)}"
+                )
+        elif voltage_range is None:
+            voltage_range = default_range
+        if offset is None:
+            offset = 0.0
+        if isinstance(offset, bool) or not isinstance(offset, Real) or not math.isfinite(offset):
+            raise ValueError("offset must be a finite voltage in V")
+        # The shared offset is the input voltage at the range center.
+        # PicoSDK instead specifies the voltage added before digitization.
+        return voltage_range, -float(offset)
+
     def __init__(self, resource=None, timeout=5000):
-    # resource/timeout are kept for API compatibility with ScopeBase.
-    # PicoScope does not use VISA resource, so do not call ScopeBase.__init__().
+        # resource/timeout are kept for API compatibility with ScopeBase.
+        # PicoScope does not use VISA resource, so do not call ScopeBase.__init__().
         self.resource = resource if resource is not None else DummyResource()
         self.timeout = timeout
         self._closed = False
@@ -114,14 +157,17 @@ class PicoScope3000E(ScopeBase):
         self,
         mode,
         channel,
-        scale=None,
-        offset=None,
+        scale,
+        offset,
         threshold_mv=50,
+        # Optional parameters for PicoScope configuration
         coupling="DC",
-        voltage_range=psdk.RANGE.mV500,
     ):
         if channel not in self.channel_map:
             raise ValueError(f"Channel {channel} is out of range")
+
+        voltage_range, analog_offset = self._channel_voltage_settings(
+            scale, offset, voltage_range, psdk.RANGE.mV500)
 
         pico_ch = self.channel_map[channel]
         self.trigger_channel = pico_ch
@@ -130,6 +176,7 @@ class PicoScope3000E(ScopeBase):
             channel=pico_ch,
             coupling=self.coupling_map[coupling],
             range=voltage_range,
+            offset=analog_offset,
         )
 
         self.scope.set_simple_trigger(
@@ -142,12 +189,12 @@ class PicoScope3000E(ScopeBase):
     def config_trace_channel(
         self,
         channel,
-        scale=None,          # Unused (API compatibility)
-        offset=None,         # Unused (API compatibility)
-        period=None,
+        scale,
+        offset,
+        period,
         delay=0,
-        coupling="AC",
-        voltage_range=psdk.RANGE.mV20,
+        # Optional parameters for PicoScope configuration
+        coupling="AC"
     ):
         """Set the capture window relative to the trigger.
 
@@ -155,9 +202,15 @@ class PicoScope3000E(ScopeBase):
         delay additionally accepts percentages of period; negative values
         select pre-trigger samples. Positive delays are captured and trimmed.
         Sample conversion is deferred until arm(), using the actual rate.
+        scale is V/div for eight divisions and must match a supported range
+        peak divided by four. offset is the range center voltage in V.
+        Specify either scale or voltage_range; the default range is ±20 mV.
         """
         if channel not in self.channel_map:
             raise ValueError(f"Channel {channel} is out of range")
+
+        voltage_range, analog_offset = self._channel_voltage_settings(
+            scale, offset, voltage_range, psdk.RANGE.mV20)
 
         duration = self.decode_time(period)
         start = self.decode_time(delay, allow_percent=True)
@@ -173,6 +226,7 @@ class PicoScope3000E(ScopeBase):
             channel=pico_ch,
             coupling=self.coupling_map[coupling],
             range=voltage_range,
+            offset=analog_offset,
         )
 
         self._period = duration

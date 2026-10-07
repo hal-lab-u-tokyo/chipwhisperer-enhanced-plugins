@@ -14,6 +14,36 @@ class TriggerMode(Enum):
 # Abstract class for all oscilloscope classes
 class ScopeBase(metaclass=ABCMeta):
     @staticmethod
+    def decode_voltage(value):
+        """Decode a real number or unit string into volts.
+
+        Numbers mean volts. Strings require V, mV, uV (also µV or μV),
+        nV, or kV. Units are case-sensitive; signs, scientific notation,
+        and whitespace around the value or before the unit are accepted.
+        Scale validity and hardware offset limits are checked by callers.
+        """
+        if isinstance(value, bool):
+            raise TypeError("Voltage specification must be a real number or string")
+        if isinstance(value, Real):
+            voltage = float(value)
+        elif isinstance(value, str):
+            match = re.fullmatch(
+                r"\s*([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)"
+                r"(?:[eE][+-]?[0-9]+)?)\s*(V|mV|uV|µV|μV|nV|kV)\s*",
+                value,
+            )
+            if match is None:
+                raise ValueError(f"Invalid voltage specification: {value!r}")
+            factors = {"V": 1, "mV": 1e-3, "uV": 1e-6, "µV": 1e-6,
+                       "μV": 1e-6, "nV": 1e-9, "kV": 1e3}
+            voltage = float(match[1]) * factors[match[2]]
+        else:
+            raise TypeError("Voltage specification must be a real number or string")
+        if not math.isfinite(voltage):
+            raise ValueError("Voltage specification must be finite")
+        return voltage
+
+    @staticmethod
     def decode_time(value, *, allow_percent=False):
         """Decode a capture duration or delay into ``(value, unit)``.
 

@@ -1,5 +1,8 @@
 from abc import ABCMeta, abstractmethod
 from enum import Enum
+import math
+from numbers import Real
+import re
 import time
 from pyvisa import VisaIOError
 
@@ -10,6 +13,51 @@ class TriggerMode(Enum):
 
 # Abstract class for all oscilloscope classes
 class ScopeBase(metaclass=ABCMeta):
+    @staticmethod
+    def decode_time(value, *, allow_percent=False):
+        """Decode a capture duration or delay into ``(value, unit)``.
+
+        Real numbers mean seconds. Strings require one of ``s``, ``ms``,
+        ``us`` (also ``µs`` or ``μs``), ``ns``, ``ps``, or ``samples``.
+        Time values are normalized to seconds; sample counts remain integers.
+        With allow_percent=True, ``%`` is accepted and kept in percent units
+        (``"-10%"`` returns ``(-10.0, "percent")``).
+
+        Units are case-sensitive. Signs, scientific notation, and whitespace
+        around the value and between the number and unit are accepted.
+        No sampling-rate conversion or duration/delay range checking is done
+        here: callers retain the unit until acquisition settings are known.
+        """
+        if isinstance(value, bool):
+            raise TypeError("Time specification must be a real number or string")
+        if isinstance(value, Real):
+            number, unit = float(value), "s"
+        elif isinstance(value, str):
+            match = re.fullmatch(
+                r"\s*([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)"
+                r"(?:[eE][+-]?[0-9]+)?)\s*(s|ms|us|µs|μs|ns|ps|samples|%)\s*",
+                value,
+            )
+            if match is None:
+                raise ValueError(f"Invalid time specification: {value!r}")
+            number, unit = float(match[1]), match[2]
+        else:
+            raise TypeError("Time specification must be a real number or string")
+
+        if not math.isfinite(number):
+            raise ValueError("Time specification must be finite")
+        if unit == "samples":
+            if not number.is_integer():
+                raise ValueError("Sample count must be an integer")
+            return int(number), "samples"
+        if unit == "%":
+            if not allow_percent:
+                raise ValueError("Percent is only supported for delay")
+            return number, "percent"
+        factors = {"s": 1, "ms": 1e-3, "us": 1e-6, "µs": 1e-6,
+                   "μs": 1e-6, "ns": 1e-9, "ps": 1e-12}
+        return number * factors[unit], "seconds"
+
     def __init__(self, resource, timeout):
         """
             resource: pyvisa resource

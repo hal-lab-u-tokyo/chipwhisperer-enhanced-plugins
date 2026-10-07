@@ -27,14 +27,13 @@ class PicoScope3000E(ScopeBase):
         "DC": psdk.COUPLING.DC,
     }
 
-    def __init__(self, model="PicoScope3000E", resource=None, timeout=5000):
+    def __init__(self, resource=None, timeout=5000):
     # resource/timeout are kept for API compatibility with ScopeBase.
     # PicoScope does not use VISA resource, so do not call ScopeBase.__init__().
         self.resource = resource if resource is not None else DummyResource()
         self.timeout = timeout
         self._closed = False
     
-        self.__model = model
         self.scope = psdk.psospa()
         self.scope.open_unit()
 
@@ -44,7 +43,11 @@ class PicoScope3000E(ScopeBase):
         self.timebase = None
 
         self.samples = 3000
-        self.pre_trig_percent = 50
+        self.pre_trig_percent = 0
+        self._period = (3000, "samples")
+        self._delay = (0, "seconds")
+        self._capture_samples = 3000
+        self._trace_slice = slice(0, 3000)
 
         self.trace_channel = psdk.CHANNEL.A
         self.trigger_channel = psdk.CHANNEL.B
@@ -142,15 +145,26 @@ class PicoScope3000E(ScopeBase):
         scale=None,          # Unused (API compatibility)
         offset=None,         # Unused (API compatibility)
         period=None,
-        delay=0,             # Unused (API compatibility)
-        impedance=None,      # Unused (API compatibility)
+        delay=0,
         coupling="AC",
         voltage_range=psdk.RANGE.mV20,
-        samples=None,
-        pre_trig_percent=50,
     ):
+        """Set the capture window relative to the trigger.
+
+        period accepts seconds or a unit string, including sample counts.
+        delay additionally accepts percentages of period; negative values
+        select pre-trigger samples. Positive delays are captured and trimmed.
+        Sample conversion is deferred until arm(), using the actual rate.
+        """
         if channel not in self.channel_map:
             raise ValueError(f"Channel {channel} is out of range")
+
+        duration = self.decode_time(period)
+        start = self.decode_time(delay, allow_percent=True)
+        if duration[0] <= 0:
+            raise ValueError("period must be positive")
+        if start[1] == "percent" and start[0] < -100:
+            raise ValueError("delay cannot precede the capture window by more than period")
 
         pico_ch = self.channel_map[channel]
         self.trace_channel = pico_ch
@@ -161,16 +175,29 @@ class PicoScope3000E(ScopeBase):
             range=voltage_range,
         )
 
-        if pre_trig_percent < 0 or pre_trig_percent > 100:
-            raise ValueError(f"pre_trig_percent {pre_trig_percent} is out of range")
-        self.pre_trig_percent = pre_trig_percent
+        self._period = duration
+        self._delay = start
 
-        if samples is not None:
-            self.samples = int(samples)
-        elif period is not None:
-            self.samples = int(period * self._sampling_rate)
-        else:
-            raise ValueError("Either samples or period must be specified")
+    def _resolve_capture_window(self):
+        # Round to the nearest sample, retaining the original units so rate
+        # changes do not change the meaning of the requested window.
+        duration, unit = self._period
+        count = duration * self._sampling_rate if unit == "seconds" else duration
+        delay, unit = self._delay
+        if unit == "seconds":
+            delay *= self._sampling_rate
+        elif unit == "percent":
+            delay *= count / 100
+        if delay < -count:
+            raise ValueError("Negative delay must not exceed period")
+        self.samples = round(count)
+        if self.samples < 1:
+            raise ValueError("period must span at least one sample")
+        delay_samples = round(delay)
+        trim = max(delay_samples, 0)
+        self._capture_samples = self.samples + trim
+        self.pre_trig_percent = max(-delay_samples, 0) * 100 / self.samples
+        self._trace_slice = slice(trim, trim + self.samples)
 
     def arm(self):
         if self.timebase is None:
@@ -178,13 +205,16 @@ class PicoScope3000E(ScopeBase):
                 "PicoScope timebase is not configured. "
                 "Call set_sampling_rate() before arm()."
                 )
+        self._resolve_capture_window()
+        self.last_trace = None
+        self.last_time_axis = None
         self.last_channel_buffer = self.scope.set_data_buffer_for_enabled_channels(
-            self.samples
+            self._capture_samples
         )
 
         self.scope.run_block_capture(
             timebase=self.timebase,
-            samples=self.samples,
+            samples=self._capture_samples,
             pre_trig_percent=self.pre_trig_percent,
             segment=0,
         )
@@ -196,7 +226,7 @@ class PicoScope3000E(ScopeBase):
             raise RuntimeError("PicoScope is not armed. Call arm() before capture().")
         try:
             actual_samples = self.scope.get_values(
-                self.samples,
+                self._capture_samples,
                 start_index=0,
                 segment=0,
                 ratio=0,
@@ -221,11 +251,11 @@ class PicoScope3000E(ScopeBase):
 
             self.last_time_axis = self.scope.get_time_axis(
                 self.timebase,
-                actual_samples,
+                self._capture_samples,
                 pre_trig_percent=self.pre_trig_percent,
                 ratio=0,
                 unit=self.time_unit,
-            )
+            )[:actual_samples]
             
             self.last_trace = self.last_channel_buffer[self.trace_channel]
             return False
@@ -243,12 +273,14 @@ class PicoScope3000E(ScopeBase):
             return None
 
         if as_int:
-            return np.asarray(self.last_trace).astype(np.int16)
+            return np.asarray(self.last_trace)[self._trace_slice].astype(np.int16)
 
-        return np.asarray(self.last_trace)
+        return np.asarray(self.last_trace)[self._trace_slice]
 
     def get_last_time_axis(self):
-        return self.last_time_axis
+        if self.last_time_axis is None:
+            return None
+        return self.last_time_axis[self._trace_slice]
     
 class DummyResource:
     def close(self):

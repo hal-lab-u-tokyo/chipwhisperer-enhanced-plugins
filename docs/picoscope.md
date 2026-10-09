@@ -1,6 +1,6 @@
 # PicoScope 3000E
 
-The `PicoScope3000E` wrapper uses `pypicosdk` and has been tested with the PicoScope 3418E.
+The `PicoScope3000E` class depends on `pypicosdk` and has been tested with the PicoScope 3418E.
 Install the native PicoSDK driver for your device and operating system as well as this package's Python dependencies. 
 Please follow the official installation instructions [page](https://www.picotech.com/library/knowledge-bases/oscilloscopes/pypicosdk-get-started).
 
@@ -8,53 +8,66 @@ The wrapper uses the `psospa` backend; other models and driver backends have not
 Connect directly through the SDK using `PicoScope3000E()`.
 The VISA `Oscilloscope(visaAddr)` factory does not open PicoScope devices.
 
+## API Overview
+Most of the API is shared with [the VISA oscilloscope wrapper](visa_scope.md), but some methods have been modified to accommodate the PicoScope's unique features. The following methods are available:
+- `set_sampling_rate(rate)`: Sets the sampling rate of the oscilloscope to the specified value. 
+However, the actual sampling rate is set when the trace channel is configured, so this method only stores the requested rate.
+If you specify unacceptable values, the PicoSDK may return an error when configuring the trace channel.
+
+- `config_trigger_channel(mode, channel, scale, offset, threshold=None, coupling="DC", probe_scale=10.0)`: Configures the specified channel as the trigger channel with the given trigger mode, vertical scale, offset, and other optional parameters.
+The PicoScope SDK only accepts voltage range instead of V/div.
+However, considering 10 vertical divisions of PicoScope software, the wrapper converts V/div to voltage range by multiplying by 5.
+PicoScope cannot detect the probe attenuation factor, so the wrapper by default assumes a 10:1 probe. The `probe_scale` argument allows you to specify the actual probe attenuation factor (1:1 or 10:1) for the trigger channel.
+- `config_trace_channel(channel, scale, offset, period, delay=0, coupling="AC", resolution=10)`: Configures the specified channel as the trace channel with the given vertical scale, offset, and other optional parameters.
+The former argumens are the same as trigger channel configuration.
+Unlike conventional oscilloscopes, the PicoScope SDK accepts limited range of offset values.
+Therefore, AC coupling is generally recommended to avoid over-range measurements.
+3000E series oscilloscopes support 8- or 10-bit acquisition, which can be selected with the `resolution` argument. The default is 10 bits.
+The configured resulution affects the maximum sampling rate.
+That is why the wrapper requires `set_sampling_rate()` to be called before `config_trace_channel()`.
+
+## Example usage
+
+
 ```python
 import chipwhisperer as cw
-import pypicosdk as psdk
-from cw_plugins.scopes import PicoScope3000E, TriggerMode
+from cw_plugins.scopes import TriggerMode
+from cw_plugins.scopes.PicoScope import PicoScope3000E
 
 scope = PicoScope3000E()
 try:
-    # Configure channels before selecting the sampling rate.
+    # Store the requested rate before configuring the trace channel.
+    scope.set_sampling_rate("1.25GS/s")
     scope.config_trigger_channel(
-        TriggerMode.EDGE_RISE, "B", threshold_mv=50,
-        coupling="DC", voltage_range=psdk.RANGE.mV500,
+        TriggerMode.EDGE_RISE, "B", scale="1V", offset=0,
+        threshold="1V", 
+        # optional parameters peculiar to the PicoScope.
+        coupling="DC", probe_scale=10.0,
     )
     scope.config_trace_channel(
-        "A", coupling="AC", voltage_range=psdk.RANGE.mV20,
-        period="3000samples", delay="-50%",
+        "A", scale="4mV", offset=0,
+        period="3000samples", delay="-50%", coupling="AC", resolution=10,
     )
-    actual_rate = scope.set_sampling_rate(1.25e9)
 
-    # target is an already connected ChipWhisperer target.
+    # target is an already connected as a ChipWhisperer target.
     # trace = cw.capture_trace(scope, target, plaintext, key)
 
-    scope.arm()
-    # Trigger the target here before retrieving the capture.
-    if scope.capture():
-        raise RuntimeError("PicoScope capture failed")
-    waveform = scope.get_last_trace()
-    time_axis = scope.get_last_time_axis()
+    ktp = cw.ktp.Basic()
+    key = ktp.next_key()
+    traceCount = 10
+    project = cw.create_project("your project.cwp")
+    for _ in range(traceCount):
+        pt = ktp.next_text()
+        target.loadInput(pt)
+        trace = cw.capture_trace(scope, target, pt, key)
+        if trace is None:
+            print("Trace capture failed.")
+            break
+        else:
+            project.traces.append(trace)
+
 finally:
     scope.close()
+
 ```
 
-
-Channels use the strings `"A"`, `"B"`, `"C"`, and `"D"`.
-Select the input range with `voltage_range`, coupling with `"AC"` or `"DC"`, and the trigger threshold in millivolts with `threshold_mv`.
-The shared API's `scale` and `offset` arguments are currently unused by this wrapper.
-
-Sampling rates are in samples per second. `set_sampling_rate()` returns the actual hardware rate, which can differ from the requested rate, and must be called before `arm()`.
-Specify trace length with `period`: a number in seconds, a time string such as `"10ns"`, or a count such as `"3000samples"`.
-`delay` is the capture start relative to the trigger. It accepts the same units, plus a percentage of the trace length: `"-50%"` selects half the trace before the trigger, and `"100samples"` starts 100 samples after the trigger.
-Positive delays capture the extra leading samples and trim them in `get_last_trace()` and `get_last_time_axis()`. Returned time coordinates remain relative to the trigger.
-Negative delays must not exceed the trace length. The default delay is zero.
-Window settings are converted using the actual sampling rate at `arm()`, so channels can be configured before the rate. Time and percentage specifications round to the nearest sample (ties to even); the resulting trace must contain at least one sample.
-
-Waveforms default to millivolts and the time axis defaults to nanoseconds.
-Set `scope.output_unit` to `"mv"`, `"v"`, or `"adc"` before acquisition to select millivolts, volts, or raw ADC counts.
-`get_last_trace(as_int=True)` casts the selected output to `int16`; select `"adc"` to obtain raw integer counts.
-
-`capture()` returns `False` on success and `True` on retrieval failure, matching the ChipWhisperer convention.
-Capture completion is handled by the SDK's `get_values()`; `is_triggered()` is a placeholder and `poll_done` is unused.
-The constructor's `resource` and `timeout` arguments are retained for API compatibility and do not configure VISA communication or an SDK capture timeout.

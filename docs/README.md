@@ -12,3 +12,4 @@
 	- [CPA accleration libraries](./fast_cpa.md)
 	- [Target control API](./hardware.md)
 	- [VISA oscilloscope API](./visa_scope.md)
+	- [PicoScope 3000E usage](./picoscope.md)

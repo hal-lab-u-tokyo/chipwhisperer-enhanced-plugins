@@ -46,6 +46,7 @@ class MSOX4000(ScopeBase):
         return float(self.query(":ACQuire:SRATe?"))
 
     def set_sampling_rate(self, rate):
+        rate = self.decode_sampling_rate(rate)
         if rate <= 0 or rate > self.max_sampling_rate:
             raise ValueError(f"Sampling rate {rate} is out of range")
         self.write(f":ACQuire:SRATe {rate:e}")
@@ -66,24 +67,39 @@ class MSOX4000(ScopeBase):
     def set_vertical_scale(self, channel, scale):
         if not (1 <= channel <= self.num_channels):
             raise ValueError(f"Channel {channel} is out of range")
+        scale = self.decode_voltage(scale)
+        if scale <= 0:
+            raise ValueError("scale must be positive")
         self.write(f":CHANnel{channel}:SCALe {scale:e}")
 
     def set_vertical_offset(self, channel, offset):
         if not (1 <= channel <= self.num_channels):
             raise ValueError(f"Channel {channel} is out of range")
+        offset = self.decode_voltage(offset)
         self.write(f":CHANnel{channel}:OFFSet {offset:e}")
 
 
-    def config_trigger_channel(self, mode, channel, scale, offset):
+    def config_trigger_channel(self, mode, channel, scale, offset, threshold=None):
+        """Configure an edge trigger with a GND-referenced threshold in V.
+
+        scale (V/div), offset (V), and threshold (V) accept unit strings.
+        None selects one division above the range center: offset + scale.
+        """
         if not (1 <= channel <= self.num_channels):
             raise ValueError(f"Channel {channel} is out of range")
-        self.write(":TRIGger:MODE EDGE")
-        self.write(":TRIGger:EDGE:LEVel 1")
-        self.write(f":TRIGger:EDGE:SOURce CHANnel{channel}")
-        self.write(f":TRIGger:EDGE:SLOPE {self.slope_str[mode]}")
+        scale = self.decode_voltage(scale)
+        offset = self.decode_voltage(offset)
+        threshold = self.decode_voltage(offset + scale if threshold is None else threshold)
+        if scale <= 0:
+            raise ValueError("scale must be positive")
+        slope = self.slope_str[mode]
         self.write(f":CHANnel{channel}:DISPlay ON")
         self.set_vertical_scale(channel, scale)
         self.set_vertical_offset(channel, offset)
+        self.write(":TRIGger:MODE EDGE")
+        self.write(f":TRIGger:EDGE:SOURce CHANnel{channel}")
+        self.write(f":TRIGger:EDGE:SLOPE {slope}")
+        self.write(f":TRIGger:EDGE:LEVel {threshold:e}")
 
     def set_close_points(self, points):
         set_points = points
@@ -107,9 +123,37 @@ class MSOX4000(ScopeBase):
         return current_points
 
     def config_trace_channel(self, channel, scale, offset, period, delay = 0, impedance = None):
+        """Configure trace duration and start relative to the trigger.
+
+        period/delay accept seconds or time/sample-count strings. delay also
+        accepts a signed percentage of period (negative means pre-trigger).
+        Sample counts are converted using the current sampling rate.
+        """
 
         if not (1 <= channel <= self.num_channels):
             raise ValueError(f"Channel {channel} is out of range")
+
+        scale = self.decode_voltage(scale)
+        offset = self.decode_voltage(offset)
+        duration, duration_unit = self.decode_time(period)
+        start, start_unit = self.decode_time(delay, allow_percent=True)
+        if scale <= 0:
+            raise ValueError("scale must be positive")
+        if duration <= 0:
+            raise ValueError("period must be positive")
+        rate = self.sampling_rate
+        period = duration / rate if duration_unit == "samples" else duration
+        if start_unit == "samples":
+            delay = start / rate
+        elif start_unit == "percent":
+            delay = period * start / 100
+        else:
+            delay = start
+        ranges = [value for value in self.time_range_list if value >= period * 2]
+        if not ranges:
+            raise ValueError("period exceeds the supported time range")
+        if round(period * rate) < 1:
+            raise ValueError("period must span at least one sample")
 
         # first, set max mem depth
         self.write(f":ACQuire:POINts {self.max_mem_depth}")
@@ -120,7 +164,7 @@ class MSOX4000(ScopeBase):
             # change to RAW mode
         mode = "RAW"
         # find suitable time range
-        new_time_range = list(filter(lambda x: x >= period * 2, self.time_range_list))[-1]
+        new_time_range = ranges[-1]
         self.write(f":TIMEBASE:RANGE {new_time_range}")
         desired_points = int(new_time_range * self.sampling_rate)
         # else:
@@ -144,7 +188,8 @@ class MSOX4000(ScopeBase):
         # if mode == "NORMAL":
         #     self.write(f":TIMEBASE:RANGE {points / self.sampling_rate}")
 
-        self.capture_samples = int(period * self.sampling_rate)
+        self.capture_samples = (duration if duration_unit == "samples"
+                                else round(period * self.sampling_rate))
 
         if not impedance is None:
             if impedance == 50:
@@ -154,7 +199,7 @@ class MSOX4000(ScopeBase):
 
             self.write(f":CHANnel{channel}:IMPedance {impedance_str}")
 
-        self.write(f":CHANel{channel}:DISPlay ON")
+        self.write(f":CHANnel{channel}:DISPlay ON")
 
     def is_triggered(self):
         return int(self.query(":TER?"))

@@ -10,7 +10,7 @@ class MSO8000(ScopeBase):
     """
     slope_str = {
         TriggerMode.EDGE_RISE: "POSitive",
-        TriggerMode.EDGE_FALL: "POSitive",
+        TriggerMode.EDGE_FALL: "NEGative",
         TriggerMode.EDGE_ANY: "RFALl"
     }
 
@@ -47,6 +47,7 @@ class MSO8000(ScopeBase):
         return float(self.query(":ACQuire:SRATe?"))
 
     def set_sampling_rate(self, rate):
+        rate = self.decode_sampling_rate(rate)
         if rate <= 0 or rate > self.max_sampling_rate:
             raise ValueError(f"Sampling rate {rate} is out of range")
 
@@ -88,32 +89,71 @@ class MSO8000(ScopeBase):
     def set_vertical_scale(self, channel, scale):
         if not (1 <= channel <= self.num_channels):
             raise ValueError(f"Channel {channel} is out of range")
+        scale = self.decode_voltage(scale)
+        if scale <= 0:
+            raise ValueError("scale must be positive")
         self.write(f":CHANNEL{channel}:SCALE {scale}")
 
     def set_vertical_offset(self, channel, offset):
         if not (1 <= channel <= self.num_channels):
             raise ValueError(f"Channel {channel} is out of range")
+        offset = self.decode_voltage(offset)
         self.write(f":CHANNEL{channel}:OFFSET {offset}")
 
 
-    def config_trigger_channel(self, mode, channel, scale, offset):
+    def config_trigger_channel(self, mode, channel, scale, offset, threshold=None):
+        """Set a GND-referenced threshold; None selects offset + scale.
+
+        scale (V/div), offset (V), and threshold (V) accept unit strings.
+        """
         if not (1 <= channel <= self.num_channels):
             raise ValueError(f"Channel {channel} is out of range")
+        scale = self.decode_voltage(scale)
+        offset = self.decode_voltage(offset)
+        threshold = self.decode_voltage(offset + scale if threshold is None else threshold)
+        if scale <= 0:
+            raise ValueError("scale must be positive")
+        slope = self.slope_str[mode]
         self.write(f":CHANnel{channel}:DISPlay ON")
         time.sleep(0.2)
 
         self.set_vertical_scale(channel, scale)
         self.set_vertical_offset(channel, offset)
         self.write(":TRIGger:MODE EDGE")
-        self.write(f":TRIGger:EDGE:LEVel {scale:e}")
         self.write(f":TRIGger:EDGE:SOURCE CHAN{channel}")
-        self.write(f":TRIGger:EDGE:SLOPe {self.slope_str[mode]}")
+        self.write(f":TRIGger:EDGE:SLOPe {slope}")
+        self.write(f":TRIGger:EDGE:LEVel {threshold:e}")
 
 
     def config_trace_channel(self, channel, scale, offset, period, delay = 0, impedance = None):
+        """Set trace duration/start in seconds or time/sample-count strings.
+
+        delay also accepts a signed percentage of period. Sample counts
+        are converted using the current sampling rate.
+        """
 
         if not (1 <= channel <= self.num_channels):
             raise ValueError(f"Channel {channel} is out of range")
+
+        scale = self.decode_voltage(scale)
+        offset = self.decode_voltage(offset)
+        duration, duration_unit = self.decode_time(period)
+        start, start_unit = self.decode_time(delay, allow_percent=True)
+        if scale <= 0:
+            raise ValueError("scale must be positive")
+        if duration <= 0:
+            raise ValueError("period must be positive")
+        srate = self.sampling_rate
+        period = duration / srate if duration_unit == "samples" else duration
+        if start_unit == "samples":
+            delay = start / srate
+        elif start_unit == "percent":
+            delay = period * start / 100
+        else:
+            delay = start
+        sample_count = duration if duration_unit == "samples" else round(period * srate)
+        if sample_count < 1:
+            raise ValueError("period must span at least one sample")
 
         self.write(f":CHANnel{channel}:DISPlay ON")
         time.sleep(0.2)
@@ -121,9 +161,7 @@ class MSO8000(ScopeBase):
         self.set_vertical_scale(channel, scale)
         self.set_vertical_offset(channel, offset)
 
-        srate = self.sampling_rate
-
-        points = (period + delay) * srate
+        points = max(period, period + delay) * srate
 
         if points > self.__get_mem_depth():
             # increase memory depth
@@ -134,7 +172,7 @@ class MSO8000(ScopeBase):
                 raise ValueError(f"Memory depth {depth} is not enough")
             self.__set_mem_depth(depth)
 
-        self.sample_count = int(period * srate)
+        self.sample_count = sample_count
 
         if not impedance is None:
             if impedance == 50:
@@ -150,7 +188,7 @@ class MSO8000(ScopeBase):
         self.write(":WAVEFORM:FORMAT BYTE")
 
         x_origin = float(self.query(':WAVEFORM:XORIGIN?'))
-        self.start_pos = max(int((delay - x_origin) * srate ), 1)
+        self.start_pos = max(round((delay - x_origin) * srate) + 1, 1)
 
 
     def is_triggered(self):
@@ -165,7 +203,7 @@ class MSO8000(ScopeBase):
         waveform_data = np.array([], np.uint8)
 
         self.write(f':WAVEFORM:START {self.start_pos}')
-        stop_pos = self.start_pos + self.sample_count
+        stop_pos = self.start_pos + self.sample_count - 1
         self.write(f':WAVEFORM:STOP {stop_pos}')
         try:
             raw_data = self.resource.query_binary_values(':WAVEFORM:DATA?', datatype='B', container=np.array)

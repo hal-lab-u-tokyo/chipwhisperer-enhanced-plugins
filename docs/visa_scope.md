@@ -46,7 +46,8 @@ None
 ### Description
 Sets the sampling rate of the oscilloscope to the specified value.
 ### Args
-- `rate` (float): The desired sampling rate to set on the oscilloscope
+- `rate` (float or str): Sampling rate in samples per second. It accepts unit-suffixed strings such as `"1.25GS/s"` or `"1250MSPS"` to specify the sampling rate in gigasamples or megasamples per second, respectively.
+
 ### Returns
 - None
 ### Raises
@@ -58,17 +59,19 @@ Sets the sampling rate of the oscilloscope to the specified value.
 Configures the specified channel as the trace channel with the given vertical scale, offset, and other optional parameters.
 ### Args
 - `channel` (int): The channel number to configure as the trace channel.
-- `scale` (float): The vertical scale for the trace channel (V/div).
-- `offset` (float): The vertical offset for the trace channel.
-- `period` (float): acquired waveform period in seconds.
-- `delay` (float): The delay in seconds to start the trace acquisition after the trigger.
+- `scale` (float or str): The vertical scale in V/div; accepts voltage strings such as `"2mV"`.
+- `offset` (float or str): The voltage at the range center, in volts or a voltage string.
+- `period` (float or str): Acquired waveform duration in seconds, a time string such as `"10us"`, or an integer sample count such as `"3000samples"`.
+- `delay` (float or str): Capture start relative to the trigger, in seconds, a time string, sample counts, or a percentage of `period`. Negative value means pre-trigger sampling.
+It also accepts strings such as `"-50%"` to specify a percentage of the capture period. 
+When using a percentage, the value must be between -100% and 100%. For example, `-50%` selects half the trace before the trigger. The default is zero.
 - `...`: Additional oscilloscope-specific parameters for configuring the trace channel.
 ### Returns
 None
 ### Raises
 - ValueError if the specified channel is invalid or out of range for the oscilloscope.
 
-## `config_trigger_channel(mode, channel, scale, offset)`
+## `config_trigger_channel(mode, channel, scale, offset, threshold=None)`
 ### Description
 Configures the specified channel as the trigger channel with the given trigger mode, vertical scale, and offset.
 ### Args
@@ -76,9 +79,11 @@ Configures the specified channel as the trigger channel with the given trigger m
     - `TriggerMode.EDGE_RISE`: Rising edge trigger
     - `TriggerMode.EDGE_FALL`: Falling edge trigger
     - `TriggerMode.EDGE_ANY`: Either rising or falling edge trigger
-- `channel` (int): The channel number to configure as the trigger channel.
-- `scale` (float): The vertical scale for the trigger channel (V/div).
-- `offset` (float): The vertical offset for the trigger channel.
+- `channel` (int): Same as `config_trace_channel()`, the channel number to configure as the trigger channel.
+- `scale` (float or str): Same as `config_trace_channel()`, the vertical scale in V/div; accepts voltage strings such as `"2mV"`.
+- `offset` (float or str): Same as `config_trace_channel()`, the voltage at the range center, in volts or a voltage string.
+- `threshold` (float or str, optional): Trigger voltage relative to ground. Accepts volts or a voltage string such as `"500mV"`. The default `None` selects `offset + scale`, one division above the center.
+
 ### Returns
 None
 ### Raises

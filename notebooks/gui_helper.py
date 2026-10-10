@@ -118,6 +118,12 @@ def get_trigger_panel(scope):
     offset_input = BoundedFloatText(value=0.0, min=-1000.0, max=1000.0, step = 0.1, description='Offset:')
     offset_unit = Dropdown(value="V", options=["V", "mV"])
 
+    level_input = Text(
+        value="", description="Trigger Level:",
+        placeholder="Auto (offset + scale), e.g. 500mV",
+        style={"description_width": "initial"}, layout={"width": "400px"},
+    )
+
     apply_button = Button(description="apply", button_style='', layout={"width": "max-content"})
     apply_button.disabled = False
 
@@ -135,7 +141,10 @@ def get_trigger_panel(scope):
 
         try:
             _check_channel_conflict(channels, 'trigger', channel)
-            scope.config_trigger_channel(channel, scale, offset, mode)
+            scope.config_trigger_channel(
+                channel, scale, offset, mode,
+                threshold=level_input.value.strip() or None,
+            )
         except Exception as e:
             msg.value = f"Error: {str(e)}"
             return
@@ -159,10 +168,11 @@ def get_trigger_panel(scope):
     scale_unit.observe(lambda _: button_unclicked(), names='value')
     offset_input.observe(lambda _: button_unclicked(), names='value')
     offset_unit.observe(lambda _: button_unclicked(), names='value')
+    level_input.observe(lambda _: button_unclicked(), names='value')
 
     apply_button.on_click(lambda _: apply_trigger_config())
 
-    return VBox([mode_sel, ch_sel, HBox([scale_input, scale_unit]), HBox([offset_input, offset_unit]), HBox([apply_button, msg])])
+    return VBox([mode_sel, ch_sel, HBox([scale_input, scale_unit]), HBox([offset_input, offset_unit]), level_input, HBox([apply_button, msg])])
 
 def showTriggerConfig(scope):
     display(get_trigger_panel(scope))

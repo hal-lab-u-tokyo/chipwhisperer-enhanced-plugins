@@ -14,10 +14,14 @@ Most of the API is shared with [the VISA oscilloscope wrapper](visa_scope.md), b
 However, the actual sampling rate is set when the trace channel is configured, so this method only stores the requested rate.
 If you specify unacceptable values, the PicoSDK may return an error when configuring the trace channel.
 
-- `config_trigger_channel(mode, channel, scale, offset, threshold=None, coupling="DC", probe_scale=10.0)`: Configures the specified channel as the trigger channel with the given trigger mode, vertical scale, offset, and other optional parameters.
+- `config_trigger_channel(channel, scale, offset, mode, threshold=None, coupling="DC", probe_scale=10.0)`: Configures the specified channel as the trigger channel with the given vertical scale, offset, trigger mode, and other optional parameters.
+The first three arguments (`channel`, `scale`, and `offset`) match `config_trace_channel()`.
+The `mode` argument is an enum of type `TriggerMode`, which can be one of the following: `EDGE_RISE`, `EDGE_FALL`, or `EDGE_ANY`.
+
 The PicoScope SDK only accepts voltage range instead of V/div.
 However, considering 10 vertical divisions of PicoScope software, the wrapper converts V/div to voltage range by multiplying by 5.
 PicoScope cannot detect the probe attenuation factor, so the wrapper by default assumes a 10:1 probe. The `probe_scale` argument allows you to specify the actual probe attenuation factor (1:1 or 10:1) for the trigger channel.
+
 - `config_trace_channel(channel, scale, offset, period, delay=0, coupling="AC", resolution=10)`: Configures the specified channel as the trace channel with the given vertical scale, offset, and other optional parameters.
 The former argumens are the same as trigger channel configuration.
 Unlike conventional oscilloscopes, the PicoScope SDK accepts limited range of offset values.
@@ -39,7 +43,7 @@ try:
     # Store the requested rate before configuring the trace channel.
     scope.set_sampling_rate("1.25GS/s")
     scope.config_trigger_channel(
-        TriggerMode.EDGE_RISE, "B", scale="1V", offset=0,
+        "B", scale="1V", offset=0, mode=TriggerMode.EDGE_RISE,
         threshold="1V", 
         # optional parameters peculiar to the PicoScope.
         coupling="DC", probe_scale=10.0,

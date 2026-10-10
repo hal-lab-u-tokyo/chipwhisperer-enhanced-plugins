@@ -158,12 +158,12 @@ class ScopeBase(metaclass=ABCMeta):
         self.set_sampling_rate(rate)
 
     @abstractmethod
-    def config_trigger_channel(self, mode, channel, scale, offset, threshold=None, **kwargs):
+    def config_trigger_channel(self, channel, scale, offset, mode, threshold=None, **kwargs):
         """
-            mode: TriggerMode
             channel: channel number
             scale: vertical scale in V
             offset: vertical offset in V
+            mode: TriggerMode
             threshold: trigger threshold in V; None selects offset + scale
             **kwargs: oscilloscope dependent parameters
         """

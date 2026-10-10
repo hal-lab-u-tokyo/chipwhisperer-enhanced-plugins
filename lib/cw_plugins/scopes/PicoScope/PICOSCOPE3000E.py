@@ -164,10 +164,10 @@ class PicoScope3000E(ScopeBase):
     
     def config_trigger_channel(
         self,
-        mode,
         channel,
         scale,
         offset,
+        mode,
         threshold=None,
         # Optional parameters for PicoScope configuration
         coupling="DC",

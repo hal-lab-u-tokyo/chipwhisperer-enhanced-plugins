@@ -1,8 +1,9 @@
 from panel import widget
 import pyvisa
-import matplotlib.pyplot as plt
-from ipywidgets import  Checkbox, IntSlider, Output, Text, widget_int, Dropdown, HBox, VBox, Button, BoundedFloatText, Label, IntText
-from IPython.display import display, clear_output
+from io import BytesIO
+from matplotlib.figure import Figure
+from ipywidgets import  Checkbox, IntSlider, Image, Text, widget_int, Dropdown, HBox, VBox, Button, BoundedFloatText, Label, IntText
+from IPython.display import display
 
 from tqdm.notebook import tqdm as tqdm_notebook
 import serial.tools.list_ports
@@ -118,6 +119,15 @@ def get_trigger_panel(scope):
     offset_input = BoundedFloatText(value=0.0, min=-1000.0, max=1000.0, step = 0.1, description='Offset:')
     offset_unit = Dropdown(value="V", options=["V", "mV"])
 
+    level_input = BoundedFloatText(
+        value=1.0, min=-1000.0, max=1000.0, step=0.1,
+        description="Trigger Level:", style={"description_width": "initial"},
+        disabled=True,
+    )
+    level_unit = Dropdown(
+        value=None, options=[("Auto (offset + scale)", None), "V", "mV"],
+    )
+
     apply_button = Button(description="apply", button_style='', layout={"width": "max-content"})
     apply_button.disabled = False
 
@@ -135,7 +145,15 @@ def get_trigger_panel(scope):
 
         try:
             _check_channel_conflict(channels, 'trigger', channel)
-            scope.config_trigger_channel(mode, channel, scale, offset)
+            threshold = None
+            if level_unit.value is not None:
+                threshold = float(level_input.value)
+                if level_unit.value == "mV":
+                    threshold /= 1000.0
+            scope.config_trigger_channel(
+                channel, scale, offset, mode,
+                threshold=threshold,
+            )
         except Exception as e:
             msg.value = f"Error: {str(e)}"
             return
@@ -159,10 +177,16 @@ def get_trigger_panel(scope):
     scale_unit.observe(lambda _: button_unclicked(), names='value')
     offset_input.observe(lambda _: button_unclicked(), names='value')
     offset_unit.observe(lambda _: button_unclicked(), names='value')
+    level_input.observe(lambda _: button_unclicked(), names='value')
+    def level_unit_changed(_):
+        level_input.disabled = level_unit.value is None
+        button_unclicked()
+
+    level_unit.observe(level_unit_changed, names='value')
 
     apply_button.on_click(lambda _: apply_trigger_config())
 
-    return VBox([mode_sel, ch_sel, HBox([scale_input, scale_unit]), HBox([offset_input, offset_unit]), HBox([apply_button, msg])])
+    return VBox([mode_sel, ch_sel, HBox([scale_input, scale_unit]), HBox([offset_input, offset_unit]), HBox([level_input, level_unit]), HBox([apply_button, msg])])
 
 def showTriggerConfig(scope):
     display(get_trigger_panel(scope))
@@ -432,7 +456,7 @@ class CapturePanel:
         self.trace_count_input.observe(update_trace_count, names='value')
 
         # waveform plotting
-        self.plot_output = Output()
+        self.plot_output = Image(format="png")
 
         # project save directory
         self.save_dir_chooser = FileChooser(title="Select Save Directory:", show_hidden=False, select_default=True)
@@ -454,12 +478,23 @@ class CapturePanel:
         
         
         self.project = project.Project()
+        self._view = VBox([
+            HBox([self.key_label, self.key_gen_button]), self.trace_count_input,
+            self.draw_interval, self.start_button, self.progress_bar.container,
+            self.plot_output, self.save_dir_chooser, self.project_name_input,
+            HBox([self.overwrite_checkbox, self.save_button]), self.save_msg,
+        ])
+        self._display_handle = None
 
     def draw_waveform(self):
-        with self.plot_output:
-            clear_output(wait=True)
-            plt.plot(self.project.waves[-1])
-            plt.show()
+        # Render without registering a pyplot figure or publishing cell output.
+        # Updating one image widget replaces the previous waveform in place.
+        fig = Figure()
+        ax = fig.subplots()
+        ax.plot(self.project.waves[-1])
+        with BytesIO() as buffer:
+            fig.savefig(buffer, format="png")
+            self.plot_output.value = buffer.getvalue()
 
     def activate_save_widgets(self):
         self.save_dir_chooser.layout.display = 'block'
@@ -518,8 +553,10 @@ class CapturePanel:
         self.key_label.value = f"Target Key: {formatted}"
 
     def show(self):
-        display(VBox([HBox([self.key_label, self.key_gen_button]), self.trace_count_input, self.draw_interval, self.start_button, self.progress_bar.container, self.plot_output, 
-                      self.save_dir_chooser, self.project_name_input,  HBox([self.overwrite_checkbox, self.save_button]), self.save_msg]))
+        if self._display_handle is None:
+            self._display_handle = display(self._view, display_id=True)
+        else:
+            self._display_handle.update(self._view)
 
     def capture(self):
         # lock config widgets

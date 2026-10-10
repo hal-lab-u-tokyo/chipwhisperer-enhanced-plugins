@@ -101,7 +101,7 @@ class MSO8000(ScopeBase):
         self.write(f":CHANNEL{channel}:OFFSET {offset}")
 
 
-    def config_trigger_channel(self, mode, channel, scale, offset, threshold=None):
+    def config_trigger_channel(self, channel, scale, offset, mode, threshold=None):
         """Set a GND-referenced threshold; None selects offset + scale.
 
         scale (V/div), offset (V), and threshold (V) accept unit strings.

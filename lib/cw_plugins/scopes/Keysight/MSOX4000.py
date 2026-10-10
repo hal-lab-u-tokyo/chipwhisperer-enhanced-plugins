@@ -79,7 +79,7 @@ class MSOX4000(ScopeBase):
         self.write(f":CHANnel{channel}:OFFSet {offset:e}")
 
 
-    def config_trigger_channel(self, mode, channel, scale, offset, threshold=None):
+    def config_trigger_channel(self, channel, scale, offset, mode, threshold=None):
         """Configure an edge trigger with a GND-referenced threshold in V.
 
         scale (V/div), offset (V), and threshold (V) accept unit strings.

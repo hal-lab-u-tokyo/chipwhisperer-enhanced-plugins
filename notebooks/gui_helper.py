@@ -135,7 +135,7 @@ def get_trigger_panel(scope):
 
         try:
             _check_channel_conflict(channels, 'trigger', channel)
-            scope.config_trigger_channel(mode, channel, scale, offset)
+            scope.config_trigger_channel(channel, scale, offset, mode)
         except Exception as e:
             msg.value = f"Error: {str(e)}"
             return

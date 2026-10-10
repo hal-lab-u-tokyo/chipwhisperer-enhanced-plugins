@@ -59,7 +59,7 @@ Sets the sampling rate of the oscilloscope to the specified value.
 Configures the specified channel as the trace channel with the given vertical scale, offset, and other optional parameters.
 ### Args
 - `channel` (int): The channel number to configure as the trace channel.
-- `scale` (float or str): The vertical scale in V/div; accepts voltage strings such as `"2mV"`.
+- `scale` (float or str): The vertical scale in V/div; accepts voltage strings such as `"1V"`.
 - `offset` (float or str): The voltage at the range center, in volts or a voltage string.
 - `period` (float or str): Acquired waveform duration in seconds, a time string such as `"10us"`, or an integer sample count such as `"3000samples"`.
 - `delay` (float or str): Capture start relative to the trigger, in seconds, a time string, sample counts, or a percentage of `period`. Negative value means pre-trigger sampling.
@@ -71,17 +71,19 @@ None
 ### Raises
 - ValueError if the specified channel is invalid or out of range for the oscilloscope.
 
-## `config_trigger_channel(mode, channel, scale, offset, threshold=None)`
+## `config_trigger_channel(channel, scale, offset, mode, threshold=None)`
+The first three arguments (`channel`, `scale`, and `offset`) match `config_trace_channel()`.
+
 ### Description
 Configures the specified channel as the trigger channel with the given trigger mode, vertical scale, and offset.
 ### Args
-- `mode` (str): trigger mode for the trace channel.
-    - `TriggerMode.EDGE_RISE`: Rising edge trigger
-    - `TriggerMode.EDGE_FALL`: Falling edge trigger
-    - `TriggerMode.EDGE_ANY`: Either rising or falling edge trigger
 - `channel` (int): Same as `config_trace_channel()`, the channel number to configure as the trigger channel.
 - `scale` (float or str): Same as `config_trace_channel()`, the vertical scale in V/div; accepts voltage strings such as `"2mV"`.
 - `offset` (float or str): Same as `config_trace_channel()`, the voltage at the range center, in volts or a voltage string.
+- `mode` (str): trigger mode for the trigger channel.
+    - `TriggerMode.EDGE_RISE`: Rising edge trigger
+    - `TriggerMode.EDGE_FALL`: Falling edge trigger
+    - `TriggerMode.EDGE_ANY`: Either rising or falling edge trigger
 - `threshold` (float or str, optional): Trigger voltage relative to ground. Accepts volts or a voltage string such as `"500mV"`. The default `None` selects `offset + scale`, one division above the center.
 
 ### Returns

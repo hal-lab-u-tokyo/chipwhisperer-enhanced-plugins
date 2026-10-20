@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  18-10-2026 16:36:13
-#   Last Modified: 18-10-2026 17:40:46
+#   Last Modified: 20-10-2026 20:13:59
 ###
 
 
@@ -30,6 +30,7 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
         super().__init__()
         self.last_key = bytes()
         self.key = bytes()
+        self._input_clock = 100E6
 
     def _con(self, scope=None, **kwargs):
         """Connect to the target FPGA
@@ -70,17 +71,18 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
 
 
     def setup(self):
-        """Default setup for CW305Shell
-
-            The template design assumes that onboard PLL generates 100MHz clock.
-            If you change the input clock frequency to the PLL IP (Clocking Wizard IP in Vivado), you need to change the PLL settings.
-
+        """
+            Default setup for CW305Shell. Mostly, this function sets up the on-board PLL.
+            Especially, PLL_CLK1 is used as a clock source for generating the system clock in the FPGA.
+            The actual input clock frequency is obtained from the hwh file if it is specified, otherwise the default value of 100MHz is used.
         """
         self.pll.pll_enable_set(True)
         self.pll.pll_outenable_set(False, 0)
         self.pll.pll_outenable_set(True, 1)
         self.pll.pll_outenable_set(False, 2)
-        self.pll.pll_outfreq_set(100E6, 1)
+
+        self.pll.pll_outfreq_set(self._input_clock, 1)
+
         self.reset()
 
 
@@ -102,7 +104,7 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
         """
 
         if self.memmap is None:
-            raise RuntimeError("No memory map is not available. Load .hwh when connecting to the target")
+            raise RuntimeError("No memory map is available. Load .hwh when connecting to the target")
 
         try:
             current_leds = self.fpga_read(self.memmap.axi_gpio.base + 8, 1) # see AMD DS744 datasheet

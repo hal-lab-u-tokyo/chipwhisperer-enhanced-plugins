@@ -1,3 +1,14 @@
+###
+#   Copyright (C) 2026 University of Tsukuba
+#   
+#   File:          /lib/cw_plugins/targets/utils.py
+#   Project:       chipwhisperer-enhanced-plugins
+#   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
+#   Created Date:  20-10-2026 15:55:40
+#   Last Modified: 20-10-2026 20:09:13
+###
+
+
 import xml.etree.ElementTree as ET
 
 class ParseError(Exception):
@@ -71,3 +82,22 @@ def vivado_parse_memmap(hwh_file, module_name):
         memmap.add_range(name, base_value, high_value)
 
     return memmap
+
+def vivado_parse_clk_freq(hwh_file, clock_name):
+    root = ET.parse(hwh_file).getroot()
+    ports = root.find("EXTERNALPORTS")
+    if ports is None:
+        raise ParseError("<EXTERNALPORTS> Tag not found")
+    for port in ports.findall("PORT"):
+        if port.get("NAME") == clock_name:
+            freq_str = port.get("CLKFREQUENCY")
+            if freq_str is None:
+                raise ParseError(f"CLKFREQUENCY attribute not found for clock {clock_name}")
+            try:
+                freq = float(freq_str)
+            except ValueError:
+                raise ParseError(f"Invalid CLKFREQUENCY value for clock {clock_name}")
+            return freq
+
+    raise ParseError(f"<PORT> Tag associated with clock {clock_name} is not found")
+

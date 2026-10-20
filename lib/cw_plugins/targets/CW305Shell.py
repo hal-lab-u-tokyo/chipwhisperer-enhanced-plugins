@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  18-10-2026 16:36:13
-#   Last Modified: 20-10-2026 20:13:59
+#   Last Modified: 21-10-2026 00:36:14
 ###
 
 
@@ -107,7 +107,7 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
             raise RuntimeError("No memory map is available. Load .hwh when connecting to the target")
 
         try:
-            current_leds = self.fpga_read(self.memmap.axi_gpio.base + 8, 1) # see AMD DS744 datasheet
+            current_leds = self.fpga_read(self.memmap.axi_usr_dip_led.base + 8, 1) # see AMD DS744 datasheet
         except AttributeError:
             raise RuntimeError("AXI GPIO module for LED control is not found in the configured FPGA design. Please check the .hwh file and the design.")
 
@@ -117,7 +117,7 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
             raise ValueError("LED number must be between 0 and 2")
 
         next_leds = current_leds | (1 << led)
-        self.fpga_write(self.memmap.axi_gpio.base + 8, next_leds)
+        self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
 
     def fpga_led_off(self, led):
         """Turn off onbaord LEDs
@@ -128,7 +128,7 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
             raise RuntimeError("No memory map is not available. Load .hwh when connecting to the target")
 
         try:
-            current_leds = self.fpga_read(self.memmap.axi_gpio.base + 8, 1)
+            current_leds = self.fpga_read(self.memmap.axi_usr_dip_led.base + 8, 1)
         except AttributeError:
             raise RuntimeError("AXI GPIO module for LED control is not found in the configured FPGA design. Please check the .hwh file and the design.")
     
@@ -139,7 +139,7 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
 
         next_leds = current_leds & ~(1 << led)
 
-        self.fpga_write(self.memmap.axi_gpio.base + 8, next_leds)
+        self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
 
     def reset(self):
         self.reset_interface()

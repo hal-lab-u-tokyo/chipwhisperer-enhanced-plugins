@@ -5,6 +5,7 @@ from .SakuraXVexRISCVAESExample import SakuraXVexRISCVAESExample
 from .CW305Shell import CW305ShellBase
 from .CW310Shell import CW310ShellBase
 from .CW305ShellAESExamples import CW305ShellExampleAES128BitRTL, CW305ShellExampleAES128BitHLS
+from .CW310ShellAESExamples import CW310ShellExampleAES128BitRTL, CW310ShellExampleAES128BitHLS
 from .CW305VexRISCV import CW305VexRISCVBase
 from .CW305VexRISCVAESExample import CW305VexRISCVAESExample
 

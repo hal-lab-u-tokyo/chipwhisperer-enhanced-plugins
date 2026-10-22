@@ -1,24 +1,26 @@
 ###
-#   Copyright (C) 2024 The University of Tokyo
+#   Copyright (C) 2026 University of Tsukuba
 #   
-#   File:          /lib/cw_plugins/targets/SakuraXVexRISCV.py
-#   Project:       sca_toolbox
-#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
-#   Created Date:  13-07-2024 16:20:31
-#   Last Modified: 15-11-2025 15:23:18
+#   File:          /lib/cw_plugins/targets/VexRiscvMixin.py
+#   Project:       chipwhisperer-enhanced-plugins
+#   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
+#   Created Date:  22-10-2026 17:07:52
+#   Last Modified: 22-10-2026 18:43:36
 ###
 
-from .SakuraXShell import SakuraXShellControlBase
+from abc import ABCMeta, abstractmethod
+
 from .utils import vivado_parse_memmap, ParseError, MemoryMap
 
+import atexit
 import warnings
 from elftools.elf.elffile import ELFFile
 from collections import namedtuple
 import numpy as np
-from abc import ABCMeta
 from pathlib import Path
 
-class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
+
+class VexRiscvMixin(metaclass=ABCMeta):
     Segment = namedtuple("Segment", ["offset", "size", "binary_size", "data"])
 
     # Peripheral address
@@ -27,43 +29,79 @@ class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
     SEND_BUF_DATA_ADDR = 0x8
     SEND_BUF_STAT_ADDR = 0xC
 
-    # def get_periph_address(self, name):
-    #     return self.periph_address_base + self.periph_address_offset[name]
-
     CHUNK_SIZE = 16
 
-    def __init__(self, ser, program, hwh_file = None, verbose = False):
-        super().__init__(ser)
-        self.debug_print = lambda x: print("[INFO]", x) if verbose else lambda x: None
-        # system reset
-        self.reset_command()
-        self.segments = []
-        self.loadProgram(program)
+    @staticmethod
+    @abstractmethod
+    def getPlatformName():
+        pass
+    
+    @staticmethod
+    @abstractmethod
+    def isBsfileSupported():
+        pass
 
-        # use default address map
+    def __init__(self):
+        self._core_stop_on_disconnect = False
+        super().__init__()
+        self.segments = []
         self.control_address = 0x4000_0000
         self.memmap_core = MemoryMap()
         self.memmap_core.add_range("axi_buffer_0", 0xA200_0000, 0xA200_FFFF)
 
-        if not hwh_file is None:
+
+    def _con(self, scope = None, program = None, **kwargs):
+        if program is None:
+            raise ValueError("program argument must be specified")
+
+        if "verbose" in kwargs:
+            verbose = kwargs["verbose"]
+            kwargs.pop("verbose")
+        else:
+            verbose = False
+
+        self.debug_print = lambda x: print("[INFO]", x) if verbose else lambda x: None
+
+        use_prebuilt_bitstream = False
+        name_base = "VexRiscv"
+        if self.isBsfileSupported():
+            use_prebuilt_bitstream = "bsfile" not in kwargs
+            if use_prebuilt_bitstream:
+                kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / self.getPlatformName() / f"{name_base}").with_suffix(".bit")
+        else:
+            if "bsfile" in kwargs:
+                raise ValueError("bsfile is not supported for this platform")
+
+        if "hwh_file" not in kwargs and use_prebuilt_bitstream:
+            kwargs["hwh_file"] = (Path(__file__).parent / "hwh_files" / self.getPlatformName() / f"{name_base}").with_suffix(".hwh")
+
+        # parent class _con() will parse the hwh file and set self.memmap, which is expected to be the memory map of the interface module (e.g., axi_buffer_0)
+        super()._con(scope, **kwargs)
+
+        if "hwh_file" in kwargs:
+            hwh_file = kwargs["hwh_file"]
             try:
-                memmap_ctrl = vivado_parse_memmap(hwh_file, "/controller_AXI_0")
                 memmap_core = vivado_parse_memmap(hwh_file, "/VexRiscv_Core_0")
-                self.control_address = memmap_ctrl.VexRiscv_Core_0.base
                 self.memmap_core = memmap_core
+                self.control_address = self.memmap.VexRiscv_Core_0.base
             except (AttributeError, ParseError, FileNotFoundError) as E:
                 warnings.warn("Error loading hardware handoff file: " + E.args[0] + ". Using default address map." )
 
+        
+        self.segments = []
+        self.loadProgram(program)
+
+
         # core reset
+        self._core_stop_on_disconnect = True
+        atexit.register(self.close)
         self.core_start()
         self.core_stop()
 
         self.boot()
         self.flush()
 
-        self.debug_print("Core start")
         self.core_start()
-
 
 
     def loadProgram(self, program):
@@ -91,74 +129,93 @@ class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
             word_data = np.frombuffer(seg.data, dtype="<u4")
             for i in range(0, len(word_data), self.CHUNK_SIZE):
                 chunk = [int(d) for d in word_data[i:i+self.CHUNK_SIZE]]
-                self.write_data(base + i * 4, chunk)
+                self.fpga_write(base + i * 4, chunk)
         self.debug_print("boot end")
 
     # core control
     def core_stop(self):
-        self.write_data(self.control_address, [0x0])
+        self.debug_print("Core stop")
+        self.fpga_write(self.control_address, [0x0])
 
     def core_start(self):
-        self.write_data(self.control_address, [0x1])
+        self.debug_print("Core start")
+        self.fpga_write(self.control_address, [0x1])
 
 
     # external intrrupt signal
     def assert_interrupt(self):
-        self.write_data(self.control_address + 4, [0x1])
+        self.fpga_write(self.control_address + 4, [0x1])
 
     def deassert_interrupt(self):
-        self.write_data(self.control_address + 4, [0x0])
+        self.fpga_write(self.control_address + 4, [0x0])
 
     def reset(self):
         super().reset()
         self.core_stop()
 
+    def dis(self):
+        atexit.unregister(self.close)
+        stop_core = self._core_stop_on_disconnect
+        self._core_stop_on_disconnect = False
+        try:
+            if self.getPlatformName() in ("cw305", "cw310"):
+                naeusb = getattr(self, "_naeusb", None)
+                backend = getattr(naeusb, "usbtx", None)
+                stop_core = stop_core and getattr(backend, "handle", None) is not None
+            if stop_core:
+                self.core_stop()
+        finally:
+            try:
+                super().dis()
+            finally:
+                self.connectStatus = False
+
     def close(self):
-        self.core_stop()
-        super().close()
+        if self._core_stop_on_disconnect:
+            self.dis()
 
     def flush(self):
         super().flush()
         addr = self.memmap_core.axi_buffer_0.base + \
                 self.RECV_BUF_DATA_ADDR
         while not self.is_recv_buffer_empty():
-            _ = self.read_data(addr, 1)[0]
+            _ = self.fpga_read(addr, 1)[0]
         addr = self.memmap_core.axi_buffer_0.base + \
                 self.SEND_BUF_DATA_ADDR
         while not self.is_send_buffer_empty():
-            _ = self.read_data(addr, 1)[0]
+            _ = self.fpga_read(addr, 1)[0]
 
     # buffer control
     def is_send_buffer_full(self):
         addr = self.memmap_core.axi_buffer_0.base + \
                 self.SEND_BUF_STAT_ADDR
-        return self.read_data(addr, 1)[0] & 0xFF00 == 1
+        return bool(self.fpga_read(addr, 1)[0] & 0x100)
 
     def is_send_buffer_empty(self):
         addr = self.memmap_core.axi_buffer_0.base + \
                 self.SEND_BUF_STAT_ADDR
-        return self.read_data(addr, 1)[0] & 0xFF == 1
+        return self.fpga_read(addr, 1)[0] & 0xFF == 1
 
     def is_recv_buffer_full(self):
         addr = self.memmap_core.axi_buffer_0.base + \
                 self.RECV_BUF_STAT_ADDR
-        return self.read_data(addr, 1)[0] & 0xFF00 == 1
+        return bool(self.fpga_read(addr, 1)[0] & 0x100)
 
     def is_recv_buffer_empty(self):
         addr = self.memmap_core.axi_buffer_0.base + \
                 self.RECV_BUF_STAT_ADDR
-        return self.read_data(addr, 1)[0] & 0xFF == 1
+        return self.fpga_read(addr, 1)[0] & 0xFF == 1
 
     def get_send_buffer_bytes(self):
         addr = self.memmap_core.axi_buffer_0.base + \
                 self.SEND_BUF_STAT_ADDR
-        stat = self.read_data(addr, 1)[0]
+        stat = self.fpga_read(addr, 1)[0]
         return (stat & 0xFFFF0000) >> 16
 
     def get_recv_buffer_bytes(self):
         addr = self.memmap_core.axi_buffer_0.base + \
                 self.RECV_BUF_STAT_ADDR
-        stat = self.read_data(addr, 1)[0]
+        stat = self.fpga_read(addr, 1)[0]
         return (stat & 0xFFFF0000) >> 16
 
     def send_bytes(self, data):
@@ -168,7 +225,7 @@ class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
             # wait until send buffer is not full
             while self.is_send_buffer_full():
                 pass
-            self.write_data(addr, [b])
+            self.fpga_write(addr, [b])
 
     def recv_bytes(self, length):
         data = bytearray()
@@ -178,18 +235,6 @@ class SakuraXVexRISCVControlBase(SakuraXShellControlBase, metaclass=ABCMeta):
             # wait until recv buffer is not empty
             while self.is_recv_buffer_empty():
                 pass
-            data.append(self.read_data(addr, 1)[0])
+            data.append(self.fpga_read(addr, 1)[0])
         return bytes(data)
-
-    def send_key(self, key : bytes):
-        raise NotImplementedError
-
-    def send_plaintext(self, plaintext : bytes):
-        raise NotImplementedError
-
-    def run(self):
-        raise NotImplementedError
-
-    def read_ciphertext(self, byte_len : int = 8):
-        raise NotImplementedError
 

@@ -1,3 +1,14 @@
+###
+#   Copyright (C) 2026 University of Tsukuba
+#   
+#   File:          /lib/cw_plugins/targets/AES128Mixin.py
+#   Project:       chipwhisperer-enhanced-plugins
+#   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
+#   Created Date:  22-10-2026 17:54:23
+#   Last Modified: 22-10-2026 17:54:26
+###
+
+
 
 from Crypto.Cipher import AES
 

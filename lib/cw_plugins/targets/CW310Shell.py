@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  18-10-2026 17:06:46
-#   Last Modified: 20-10-2026 20:15:18
+#   Last Modified: 22-10-2026 16:59:43
 ###
 
 
@@ -19,7 +19,6 @@ from .utils import vivado_parse_clk_freq
 from abc import ABCMeta, abstractmethod
 
 class CW310ShellBase(CWShellMixin,CW310, metaclass=ABCMeta):
-
 
     def __init__(self):
         super().__init__()
@@ -61,12 +60,20 @@ class CW310ShellBase(CWShellMixin,CW310, metaclass=ABCMeta):
             self.memmap = str(hwh_path), "/usb_interface_0"
             self._input_clock = vivado_parse_clk_freq(str(hwh_path), "PLL_CLK1")
 
+       # we do not use verilog define file.
+        # instead, we use the hardware handoff file (.hwh) to get the address map.        
+        kwargs["slurp"] = False
+        
         super()._con(**kwargs)
 
+        self.init_pll()
+        self.reset_interface()
+        self.soft_reset()
 
-    def setup(self):
+
+    def init_pll(self):
         """
-            Default setup for CW310Shell. Mostly, this function sets up the on-board PLL.
+            Sets up the on-board PLL.
             Especially, PLL_CLK1 is used as a clock source for generating the system clock in the FPGA.
             The actual input clock frequency is obtained from the hwh file if it is specified, otherwise the default value of 100MHz is used.
 
@@ -78,7 +85,6 @@ class CW310ShellBase(CWShellMixin,CW310, metaclass=ABCMeta):
 
         self.pll.pll_outfreq_set(self._input_clock, 1)
 
-        self.reset()
 
     def reset(self):
         self.reset_interface()

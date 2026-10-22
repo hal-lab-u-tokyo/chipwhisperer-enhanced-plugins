@@ -5,15 +5,17 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  27-03-2024 18:15:49
-#   Last Modified: 28-09-2026 17:53:21
+#   Last Modified: 22-10-2026 16:43:56
 ###
 
 
 from chipwhisperer.capture.targets._base import TargetTemplate
 import serial
 from pathlib import Path
+from os import PathLike
 import numpy as np
 from abc import ABCMeta, abstractmethod
+from .utils import vivado_parse_memmap,MemoryMap
 
 from collections.abc import Iterable
 import time
@@ -28,130 +30,6 @@ CMD_OK = 0x0
 CMD_ERROR = 0x1
 UNKNOWN_CMD = 0x2
 
-class SakuraXShellControlBase(metaclass=ABCMeta):
-    """Base Interface for Sakura-X Shell Controller
-        This class is an abstract class for Sakura-X Shell Controller.
-        Derived class must implement the following methods depending on the custom hardware on the Kintex-7 FPGA.
-        * send_key: Send encryption key to the encryption module
-        * send_plaintext: Send plaintext to the encryption module
-        * run: Start encryption
-        * read_ciphertext: Read ciphertext from the encryption module
-    """
-    ADDRESS_MAP = {
-        "key": 0x0,
-        "plaintext": 0x10,
-        "ciphertext": 0x20,
-    }
-    # Command format
-    # +------------------+--------------+--------------------+---------+-------------------+
-    # |      4 bits      |    4 bits    |       4 bits       | 32 bits |      4 bits       |
-    # +------------------+--------------+--------------------+---------+-------------------+
-    # | Preamble 2'b1000 | Command type | Command Attributes |   Args  | Postamble 2'b0001 |
-    # +------------------+--------------+--------------------+---------+-------------------+
-    # Command type
-    # * 0x0: Reset
-    # * 0x1: Read data
-    # * 0x2: Write data
-    # Read data commnad
-    # * Attributes: data length (0 means 1 word, 15 means 16 words)
-    # * Args: address
-    # Write data command
-    # Same as read data command
-    # Reset command
-    # * arributes must be 0
-    # * Args are not used
-
-    def __init__(self, ser) -> None:
-        self.ser = ser
-        self.ser.reset_input_buffer()
-
-    def flush(self):
-        self.ser.flush()
-        self.ser.reset_output_buffer()
-
-    def __wait_for_response(self):
-        resp = self.ser.read(1)
-        if len(resp) == 0:
-            raise RuntimeError("""Timeout Error. Possiblly controller is stuck.
-            Check the status LEDs. If the controller is stuck, LED 16 will be turned on.
-            When the input fifo is full and the controller cannot accpet further input, LED 14 will be turned off. In this case, you need to reset the controller by calling hard_reset() method of the target.""")
-        elif resp[0] == CMD_OK:
-            return
-        elif resp[0] == CMD_ERROR:
-            raise RuntimeError("Command Error")
-        elif resp[0] == UNKNOWN_CMD:
-            raise RuntimeError("Unknown Command")
-        else:
-            raise RuntimeError("Unexpected Response received")
-
-    def write_data(self, addr : int, data : Iterable):
-        word_len = len(data)
-        if word_len > 16:
-            raise ValueError("Data length must be less than or equal to 16")
-        cmd = f"{PREAMBLE:1X}_{CMD_WRITE:1X}_{word_len-1:1X}_{addr:08X}_{POSTAMBLE:1X}"
-        cmd_bin = int(cmd,16).to_bytes(6, 'big')
-        self.ser.write(cmd_bin)
-        self.__wait_for_response()
-        data_bin = b''.join([d.to_bytes(4, 'big') for d in data])
-        self.ser.write(data_bin)
-
-    def read_data(self, addr : int, length : int):
-        """
-            Read data from Sakura-X-Shell Controller
-            Args:
-                addr (int): Start address
-                length (int): Data length in words
-            Returns:
-                list of 32 bit integers
-
-        """
-        if not (1 <= length <= 16):
-            raise ValueError("Data length must be between 1 and 16")
-        cmd = f"{PREAMBLE:1X}_{CMD_READ:1X}_{length-1:1X}_{addr:08X}_{POSTAMBLE:1X}"
-        cmd_bin = int(cmd,16).to_bytes(6, 'big')
-        self.ser.write(cmd_bin)
-        self.__wait_for_response()
-        read_bin = self.ser.read(length * 4)
-
-        return [int.from_bytes(read_bin[4*i:4*i+4], byteorder='big') for i in range(length)]
-
-
-    def reset_command(self):
-        """Send reset signal to modules on the Kintex-7 FPGA
-        """
-        cmd = f"{PREAMBLE:1X}_00_{0x0:08X}_{POSTAMBLE:1X}"
-        cmd_bin = int(cmd,16).to_bytes(6, 'big')
-        self.ser.write(cmd_bin)
-        self.__wait_for_response()
-        # wait encryption module to be ready
-        time.sleep(1)
-
-
-    def reset(self):
-        self.flush()
-        self.reset_command()
-
-    def close(self):
-        self.ser.close()
-
-    @abstractmethod
-    def send_key(self, key : bytes):
-        pass
-
-    @abstractmethod
-    def send_plaintext(self, plaintext : bytes):
-        pass
-
-    @abstractmethod
-    def run(self):
-        pass
-
-    @abstractmethod
-    def read_ciphertext(self, byte_len : int = 8):
-        pass
-
-    def isDone(self):
-        return True
 
 class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
     """Base Class for Sakura-X Shell Target
@@ -161,6 +39,35 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
     DEVICE_DIRECTORY = Path('/dev/sakura-x-shell')
     SYS_TTY_DIRECTORY = Path('/sys/class/tty')
 
+    def __init__(self) -> None:
+        """Initialize target state; connection options are supplied to con()."""
+        super().__init__()
+        self.connectStatus = False
+        self.scope = None
+        self.last_key = bytes()
+        self.key = bytes()
+        self.ser = None
+        self.reset_ser = None
+        self.serial_number = None
+        self._memmap = None
+
+    @property
+    def memmap(self):
+        return self._memmap
+
+    @memmap.setter
+    def memmap(self, value: MemoryMap | tuple[str | PathLike, str]):
+        if isinstance(value, MemoryMap):
+            self._memmap = value
+        elif isinstance(value, tuple) and len(value) == 2:
+            hwh_file, module_name = value
+            self._memmap = vivado_parse_memmap(hwh_file, module_name)
+        else:
+            raise ValueError("memmap must be a MemoryMap instance or a tuple of (hwh_file, module_name)")
+
+    ##############################################
+    ############ Serial Port Handling ############
+    ##############################################
     @staticmethod
     def _usb_interface(tty):
         """Find the USB interface ancestor of a Linux sysfs tty entry."""
@@ -204,19 +111,6 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
                                f'{port}, found {len(peers)}; specify both ports')
 
         return detected_serial, peers[0]
-
-    def __init__(self) -> None:
-        """Initialize target state; connection options are supplied to con()."""
-        super().__init__()
-        self.connectStatus = False
-        self.ctrl = None
-        self.scope = None
-        self.last_key = bytes()
-        self.key = bytes()
-        self.ser = None
-        self.reset_ser = None
-        self.serial_number = None
-        self._control_kwargs = {}
 
     @classmethod
     def _resolve_ports(cls, serial_number, data_port, reset_port):
@@ -280,6 +174,13 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
         For macOS and Windows, specify both data_port and reset_port. 
         With multiple boards, if you do not specify serial_number, the first board found will be used.
         """
+
+         # check if hwh file exists in the same directory as bitstream
+        if "hwh_file" in kwargs:
+            hwh_path = Path(kwargs["hwh_file"])
+            if hwh_path.exists():
+                self.memmap = str(hwh_path), "/controller_AXI_0"
+
         if serial_port is not None:
             if data_port is not None:
                 raise TypeError('Specify only one of data_port and deprecated serial_port')
@@ -306,15 +207,16 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
             time.sleep(1)
             self.ser = serial.Serial(data_port, timeout=1, write_timeout=1)
             self.scope = scope
-            self._control_kwargs = dict(kwargs)
-            self.ctrl = self.getControl(**kwargs)
             self.serial_number = selected
             self.last_key = bytes()
+            self.reset_interface()
+            self.soft_reset()
         except Exception:
             self._close_ports()
             raise
 
-    def hard_reset(self):
+
+    def reset_interface(self):
         """Reset both FPGA communication paths and reinitialize the controller.
 
         Discards pending data trasnfers and reinitializes the controller's state.
@@ -322,7 +224,7 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
         if (self.ser is None or self.reset_ser is None
                 or not self.ser.is_open or not self.reset_ser.is_open):
             raise RuntimeError('SAKURA-X Shell is not connected')
-        self.ctrl = None
+
         self.last_key = bytes()
         self.key = bytes()
         try:
@@ -336,20 +238,12 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
                 self.reset_ser.rts = False
             time.sleep(1)
             self.ser.reset_input_buffer()
-            self.ctrl = self.getControl(**self._control_kwargs)
         except Exception:
             self._close_ports()
             raise
 
-    def reset(self):
-        self.ctrl.reset()
-
     def _dis(self):
-        try:
-            if self.ctrl is not None:
-                self.ctrl.close()
-        finally:
-            self._close_ports()
+        self._close_ports()
 
     def _close_ports(self):
         """Release both channels even if controller shutdown fails."""
@@ -369,25 +263,111 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
                 finally:
                     reset.close()
 
+    def reset(self):
+        self.reset_interface()
+        self.soft_reset()
+        self.last_key = bytes()
+
+
+    ###########################################################
+    ############# FPGA Communication Functionality ############
+    ###########################################################
+
+    # Command format
+    # +------------------+--------------+--------------------+---------+-------------------+
+    # |      4 bits      |    4 bits    |       4 bits       | 32 bits |      4 bits       |
+    # +------------------+--------------+--------------------+---------+-------------------+
+    # | Preamble 2'b1000 | Command type | Command Attributes |   Args  | Postamble 2'b0001 |
+    # +------------------+--------------+--------------------+---------+-------------------+
+    # Command type
+    # * 0x0: Reset
+    # * 0x1: Read data
+    # * 0x2: Write data
+    # Read data commnad
+    # * Attributes: data length (0 means 1 word, 15 means 16 words)
+    # * Args: address
+    # Write data command
+    # Same as read data command
+    # Reset command
+    # * arributes must be 0
+    # * Args are not used
+
+    def __wait_for_response(self):
+        resp = self.ser.read(1)
+        if len(resp) == 0:
+            raise RuntimeError("""Timeout Error. Possiblly controller is stuck.
+            Check the status LEDs. If the controller is stuck, LED 16 will be turned on.
+            When the input fifo is full and the controller cannot accpet further input, LED 14 will be turned off. In this case, you need to reset the controller by calling hard_reset() method of the target.""")
+        elif resp[0] == CMD_OK:
+            return
+        elif resp[0] == CMD_ERROR:
+            raise RuntimeError("Command Error")
+        elif resp[0] == UNKNOWN_CMD:
+            raise RuntimeError("Unknown Command")
+        else:
+            raise RuntimeError("Unexpected Response received")
+
+    def fpga_write(self, addr : int, data : Iterable[int] | int):
+        # check data type
+        if not hasattr(data, "__iter__"):
+            data = [data]
+        else:
+            data = list(data)
+
+        word_len = len(data)
+        if not (1 <= word_len <= 16):
+            raise ValueError("Data length must be between 1 and 16")
+        data_bin = b''.join([int(d).to_bytes(4, 'big') for d in data])
+        cmd = f"{PREAMBLE:1X}_{CMD_WRITE:1X}_{word_len-1:1X}_{addr:08X}_{POSTAMBLE:1X}"
+        cmd_bin = int(cmd,16).to_bytes(6, 'big')
+        self.ser.write(cmd_bin)
+        self.__wait_for_response()
+        self.ser.write(data_bin)
+
+    def fpga_read(self, addr : int, data_len : int):
+        """
+            Read data from Sakura-X-Shell Controller
+            Args:
+                addr (int): Start address
+                data_len (int): Data length in words
+            Returns:
+                numpy array (data type = numpy.uint32)
+
+        """
+        if not (1 <= data_len <= 16):
+            raise ValueError("Data length must be between 1 and 16")
+        cmd = f"{PREAMBLE:1X}_{CMD_READ:1X}_{data_len-1:1X}_{addr:08X}_{POSTAMBLE:1X}"
+        cmd_bin = int(cmd,16).to_bytes(6, 'big')
+        self.ser.write(cmd_bin)
+        self.__wait_for_response()
+        read_bin = self.ser.read(data_len * 4)
+        if len(read_bin) != data_len * 4:
+            raise RuntimeError(
+                f"FPGA read returned {len(read_bin)} bytes; expected {data_len * 4} bytes")
+
+        return np.frombuffer(read_bin, dtype=">u4").astype(np.uint32)
+
+    def soft_reset(self):
+        """Send reset signal to modules on the Kintex-7 FPGA
+        """
+        cmd = f"{PREAMBLE:1X}_00_{0x0:08X}_{POSTAMBLE:1X}"
+        cmd_bin = int(cmd,16).to_bytes(6, 'big')
+        self.ser.write(cmd_bin)
+        self.__wait_for_response()
+        # wait encryption module to be ready
+        time.sleep(1)
+
+    
     def flush(self):
-        self.ctrl.flush()
+        self.ser.flush()
+        self.ser.reset_output_buffer()
 
-    def readOutput(self):
-        return np.frombuffer(self.ctrl.read_ciphertext(self.textLen()),\
-                            dtype=np.uint8)
-
-    def go(self):
-        self.ctrl.run()
-
-    def getName(self):
-        return "Base Class for Sakura-X Shell"
-
-    # Abstract methods
+    ###########################################################
+    #############         abstract methods        #############
+    ###########################################################
     @abstractmethod
-    def getControl(self, **kwargs) -> SakuraXShellControlBase:
-        """Derived class must implement this method to instantiate SakuraXShellControlBase derived class"""
+    def go(self):
         pass
-
 
     @abstractmethod
     def getExpected(self):
@@ -405,6 +385,19 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
     def loadInput(self, inputtext):
         """Load input text to the target module"""
         pass
+
+    @abstractmethod
+    def readOutput(self):
+        """Read ciphertext from the target module"""
+        pass
+
+
+    def getName(self):
+        return "Base Class for Sakura-X Shell"
+
+    def isDone(self):
+        """Check if the target module has finished the encryption"""
+        return True
 
 
     # Wrapper methods for compatibility with ChipWhisperer.capture_trace
@@ -434,5 +427,4 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
     def is_done(self):
         return self.isDone()
 
-    def isDone(self):
-        return self.ctrl.isDone()
+

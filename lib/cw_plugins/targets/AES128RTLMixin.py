@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  21-10-2026 00:33:44
-#   Last Modified: 21-10-2026 00:33:46
+#   Last Modified: 22-10-2026 16:46:52
 ###
 
 from .AES128Mixin import AES128Mixin
@@ -60,25 +60,39 @@ class AES128RTLMixin(AES128Mixin,metaclass=ABCMeta):
     def getPlatformName():
         pass
 
+    @staticmethod
+    @abstractmethod
+    def isBsfileSupported():
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def hasUsbTrigger():
+        pass
+
     def _con(self, scope=None, implementation="aist", **kwargs):
         name_base = self.NAME_BASE_DICT[implementation]
 
         use_prebuilt_bitstream = False
-        if "bsfile" not in kwargs:
-            kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / self.getPlatformName() / name_base).with_suffix(".bit")
-            use_prebuilt_bitstream = True
+        if self.isBsfileSupported():
+            use_prebuilt_bitstream = "bsfile" not in kwargs
+            if use_prebuilt_bitstream:
+                kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / self.getPlatformName() / name_base).with_suffix(".bit")
+        else:
+            if "bsfile" in kwargs:
+                raise ValueError("bsfile is not supported for this platform")
 
-        if "hwh_file" not in kwargs and use_prebuilt_bitstream:
+        if "hwh_file" not in kwargs and (use_prebuilt_bitstream or \
+                                         not self.isBsfileSupported()):
             kwargs["hwh_file"] = (Path(__file__).parent / "hwh_files" / self.getPlatformName() / name_base).with_suffix(".hwh")
 
         super()._con(scope, **kwargs)
+        
         try:
             self.address_base = self.memmap.aes_rtl_core_0.base
         except AttributeError:
             warnings.warn("Error loading hardware handoff file. Using default address map.")
             self.address_base = 0x8000_0000
-
-        self.setup()
 
         if implementation == "aist":
             self.key_address = self.address_base + self.AIST_CORE.ADDRESS_MAP["key"]
@@ -112,7 +126,11 @@ class AES128RTLMixin(AES128Mixin,metaclass=ABCMeta):
 
     def run_google_core(self):
         # use external trigger
-        self.usb_trigger_toggle()
+        if self.hasUsbTrigger():
+            self.usb_trigger_toggle()
+        else:
+            self.fpga_write(self.address_base + self.GOOGLE_CORE.ADDRESS_MAP["control"], \
+                         [self.GOOGLE_CORE.ENC_START_BIT ])
 
     def run_rsm_core(self):
         rotate = random.randint(0, 15)

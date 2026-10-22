@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  21-10-2026 00:33:56
-#   Last Modified: 21-10-2026 01:26:54
+#   Last Modified: 22-10-2026 16:06:29
 ###
 
 
@@ -17,13 +17,29 @@ from .AES128HLSMixin import AES128HLSMixin
 class CW310ShellExampleAES128BitRTL(AES128RTLMixin, CW310ShellBase):
     def __init__(self):
         super().__init__()
+
     @staticmethod
     def getPlatformName():
-        return "CW305"
+        return "cw310"
+
+    @staticmethod
+    def isBsfileSupported():
+        return True
+
+    @staticmethod
+    def hasUsbTrigger():
+        return True
+
 
 class CW310ShellExampleAES128BitHLS(AES128HLSMixin, CW310ShellBase):
     def __init__(self):
         super().__init__()
+
     @staticmethod
     def getPlatformName():
-        return "CW305"
+        return "cw310"
+
+    @staticmethod
+    def isBsfileSupported():
+        return True
+

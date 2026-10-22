@@ -69,13 +69,13 @@ def hardware_files():
     """Map package-relative destinations to available hardware artifacts."""
     root = Path(__file__).resolve().parent / "hardware"
     files = {}
-    for board in ("sakura-x", "cw305"):
+    for board in ("sakura-x", "cw305", "cw310"):
         examples = root / f"{board}-shell" / "examples"
         for source in examples.rglob("*.hwh"):
             files[Path("targets/hwh_files") / board / f"{source.parent.stem}.hwh"] = source
-        if board == "cw305":
+        if board in ("cw305", "cw310"):
             for source in examples.rglob("*.bit"):
-                files[Path("targets/bitstreams/cw305") / f"{source.parent.stem}.bit"] = source
+                files[Path("targets/bitstreams") / board / f"{source.parent.stem}.bit"] = source
     for suffix, directory in (("hwh", "hwh_files"), ("bit", "bitstreams")):
         source = root / "VexRiscv_SCA/bitstream" / f"prebuilt_cw305.{suffix}"
         if source.is_file():

@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  21-10-2026 00:34:06
-#   Last Modified: 21-10-2026 00:40:56
+#   Last Modified: 22-10-2026 16:47:15
 ###
 
 from .AES128Mixin import AES128Mixin
@@ -33,16 +33,15 @@ class AES128HLSMixin(AES128Mixin,metaclass=ABCMeta):
         super().__init__()
         self.rsm_impl = False
 
-    def setup(self):
-        super().setup()
-        self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["key_offset"], [self.key_address])
-        self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["plaintext_offset"], [self.plaintext_address])
-        self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["ciphertext_offset"], [self.ciphertext_address])
-        self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["control"], [self.CTRL_AP_CONTINUE])
 
     @staticmethod
     @abstractmethod
     def getPlatformName():
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def isBsfileSupported():
         pass
 
     def _con(self, scope=None, implementation = "naive", **kwargs):
@@ -56,15 +55,21 @@ class AES128HLSMixin(AES128Mixin,metaclass=ABCMeta):
             raise ValueError(f"Unknown implementation {implementation}")
 
         use_prebuilt_bitstream = False
-        if "bsfile" not in kwargs:
-            kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / self.getPlatformName() / f"{name_base}").with_suffix(".bit")
-            use_prebuilt_bitstream = True
+        if self.isBsfileSupported():
+            use_prebuilt_bitstream = "bsfile" not in kwargs
+            if use_prebuilt_bitstream:
+                kwargs["bsfile"] = (Path(__file__).parent / "bitstreams" / self.getPlatformName() / f"{name_base}").with_suffix(".bit")
+        else:
+            if "bsfile" in kwargs:
+                raise ValueError("bsfile is not supported for this platform")
 
-        if "hwh_file" not in kwargs and use_prebuilt_bitstream:
+        if "hwh_file" not in kwargs and (use_prebuilt_bitstream or \
+                                         not self.isBsfileSupported()):
             kwargs["hwh_file"] = (Path(__file__).parent / "hwh_files" / self.getPlatformName() / f"{name_base}").with_suffix(".hwh")
 
 
         super()._con(scope, **kwargs)
+
         try:
             if implementation == "rsm":
                 self.core_address = self.memmap.RSM_AES128Encrypt_0.base
@@ -81,7 +86,10 @@ class AES128HLSMixin(AES128Mixin,metaclass=ABCMeta):
         self.plaintext_address = self.bram_address + 0x10
         self.ciphertext_address = self.bram_address + 0x20
 
-        self.setup()
+        self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["key_offset"], [self.key_address])
+        self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["plaintext_offset"], [self.plaintext_address])
+        self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["ciphertext_offset"], [self.ciphertext_address])
+        self.fpga_write(self.core_address + self.CTRL_ADDRESS_MAP["control"], [self.CTRL_AP_CONTINUE])
 
 
     def getName(self):

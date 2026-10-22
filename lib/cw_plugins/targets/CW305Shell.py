@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  18-10-2026 16:36:13
-#   Last Modified: 21-10-2026 00:36:14
+#   Last Modified: 22-10-2026 16:59:31
 ###
 
 
@@ -67,12 +67,20 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
         if hwh_path.exists():
             self.memmap = str(hwh_path), "/usb_interface_0"
 
+        # we do not use verilog define file.
+        # instead, we use the hardware handoff file (.hwh) to get the address map.        
+        kwargs["slurp"] = False
+
         super()._con(**kwargs)
 
+        self.init_pll()
+        self.reset_interface()
+        self.soft_reset()
 
-    def setup(self):
+
+    def init_pll(self):
         """
-            Default setup for CW305Shell. Mostly, this function sets up the on-board PLL.
+            Sets up the on-board PLL.
             Especially, PLL_CLK1 is used as a clock source for generating the system clock in the FPGA.
             The actual input clock frequency is obtained from the hwh file if it is specified, otherwise the default value of 100MHz is used.
         """
@@ -82,8 +90,6 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
         self.pll.pll_outenable_set(False, 2)
 
         self.pll.pll_outfreq_set(self._input_clock, 1)
-
-        self.reset()
 
 
     def fpga_led_on(self, led):

@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  18-10-2026 17:06:46
-#   Last Modified: 22-10-2026 16:59:43
+#   Last Modified: 22-10-2026 19:30:24
 ###
 
 
@@ -25,6 +25,7 @@ class CW310ShellBase(CWShellMixin,CW310, metaclass=ABCMeta):
         self.last_key = bytes()
         self.key = bytes()
         self._input_clock = 100E6
+        self._bsfile = None
 
     def _con(self, scope=None, **kwargs):
         """Connect to the target FPGA
@@ -49,16 +50,21 @@ class CW310ShellBase(CWShellMixin,CW310, metaclass=ABCMeta):
             self._bsfile = kwargs["bsfile"]
 
         # check if hwh file exists in the same directory as bitstream
+        hwh_path = None
         if "hwh_file" not in kwargs:
-            bs_path = Path(self._bsfile)
-            hwh_path = bs_path.parent / (bs_path.stem + ".hwh")
+            if self._bsfile is not None:
+                bs_path = Path(self._bsfile)
+                hwh_path = bs_path.parent / (bs_path.stem + ".hwh")
         else:
             hwh_path = Path(kwargs["hwh_file"])
             kwargs.pop("hwh_file")
 
-        if hwh_path.exists():
+        if hwh_path is not None and hwh_path.exists():
             self.memmap = str(hwh_path), "/usb_interface_0"
             self._input_clock = vivado_parse_clk_freq(str(hwh_path), "PLL_CLK1")
+        else:
+            print("Warning: hwh file not found. It is recommended to specify the hwh file to get the correct memory map and input clock frequency.")
+
 
        # we do not use verilog define file.
         # instead, we use the hardware handoff file (.hwh) to get the address map.        
@@ -69,6 +75,44 @@ class CW310ShellBase(CWShellMixin,CW310, metaclass=ABCMeta):
         self.init_pll()
         self.reset_interface()
         self.soft_reset()
+
+    def fpga_led_on(self, led):
+        """Turn on onbaord LED[0:7]
+
+        Args:
+            led (int): LED number to turn on. Must be between 0 and 7
+        """
+        if led < 0 or led > 7:
+            raise ValueError("LED number must be between 0 and 7")
+        if self.memmap is None:
+            raise RuntimeError("No memory map is available. Load .hwh when connecting to the target")
+
+        try:
+            current_leds = self.fpga_read(self.memmap.axi_usr_dip_led.base + 8, 1) # see AMD DS744 datasheet
+        except AttributeError:
+            raise RuntimeError("AXI GPIO module for LED control is not found in the configured FPGA design. Please check the .hwh file and the design.")
+
+        next_leds = int(current_leds[0]) | (1 << led)
+        self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
+
+    def fpga_led_off(self, led):
+        """Turn off onbaord LED[0:7]
+
+        Args:
+            led (int): LED number to turn off. Must be between 0 and 7
+        """
+        if led < 0 or led > 7:
+            raise ValueError("LED number must be between 0 and 7")
+        if self.memmap is None:
+            raise RuntimeError("No memory map is available. Load .hwh when connecting to the target")
+
+        try:
+            current_leds = self.fpga_read(self.memmap.axi_usr_dip_led.base + 8, 1) # see AMD DS744 datasheet
+        except AttributeError:
+            raise RuntimeError("AXI GPIO module for LED control is not found in the configured FPGA design. Please check the .hwh file and the design.")
+
+        next_leds = int(current_leds[0]) & ~(1 << led)
+        self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
 
 
     def init_pll(self):

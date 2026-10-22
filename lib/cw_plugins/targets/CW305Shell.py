@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  18-10-2026 16:36:13
-#   Last Modified: 22-10-2026 16:59:31
+#   Last Modified: 22-10-2026 19:30:37
 ###
 
 
@@ -13,6 +13,7 @@ from pathlib import Path
 from enum import Enum
 
 from chipwhisperer.capture.targets import CW305
+from cw_plugins.targets.utils import vivado_parse_clk_freq
 
 from .CWShellMixin import CWShellMixin
 
@@ -57,15 +58,20 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
             self._bsfile = kwargs["bsfile"]
 
         # check if hwh file exists in the same directory as bitstream
+        hwh_path = None
         if "hwh_file" not in kwargs:
-            bs_path = Path(self._bsfile)
-            hwh_path = bs_path.parent / (bs_path.stem + ".hwh")
+            if self._bsfile is not None:
+                bs_path = Path(self._bsfile)
+                hwh_path = bs_path.parent / (bs_path.stem + ".hwh")
         else:
             hwh_path = Path(kwargs["hwh_file"])
             kwargs.pop("hwh_file")
 
-        if hwh_path.exists():
+        if hwh_path is not None and hwh_path.exists():
             self.memmap = str(hwh_path), "/usb_interface_0"
+            self._input_clock = vivado_parse_clk_freq(str(hwh_path), "PLL_CLK1")
+        else:
+            print("Warning: hwh file not found. It is recommended to specify the hwh file to get the correct memory map and input clock frequency.")
 
         # we do not use verilog define file.
         # instead, we use the hardware handoff file (.hwh) to get the address map.        
@@ -122,7 +128,7 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
         if led > 2 or led < 0:
             raise ValueError("LED number must be between 0 and 2")
 
-        next_leds = current_leds | (1 << led)
+        next_leds = int(current_leds[0]) | (1 << led)
         self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
 
     def fpga_led_off(self, led):
@@ -143,7 +149,7 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
         if led > 2 or led < 0:
             raise ValueError("LED number must be between 0 and 2")
 
-        next_leds = current_leds & ~(1 << led)
+        next_leds = int(current_leds[0]) & ~(1 << led)
 
         self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
 

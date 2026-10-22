@@ -1,40 +1,25 @@
 ###
-#   Copyright (C) 2025 The University of Tokyo
+#   Copyright (C) 2026 University of Tsukuba
 #   
-#   File:          /CW305Shell.py
-#   Project:       sca_toolbox
-#   Author:        Takuya Kojima in The University of Tokyo (tkojima@hal.ipc.i.u-tokyo.ac.jp)
-#   Created Date:  22-01-2025 08:34:28
-#   Last Modified: 03-08-2026 20:51:42
+#   File:          /lib/cw_plugins/targets/CW305Shell.py
+#   Project:       chipwhisperer-enhanced-plugins
+#   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
+#   Created Date:  18-10-2026 16:36:13
+#   Last Modified: 21-10-2026 00:36:14
 ###
 
-from pathlib import Path
-import time
 
+from pathlib import Path
 from enum import Enum
 
 from chipwhisperer.capture.targets import CW305
-import numpy as np
 
-from .utils import vivado_parse_memmap
+from .CWShellMixin import CWShellMixin
 
 from abc import ABCMeta, abstractmethod
 
 
-
-class CW305ShellBase(CW305, metaclass=ABCMeta):
-    # flit format constants
-    FLIT_READ_ADDR_UPPER=0
-    FLIT_READ_ADDR_LOWER=1
-    FLIT_WRITE_ADDR_UPPER=2
-    FLIT_WRITE_ADDR_LOWER=3
-    FLIT_WRITE_DATA_UPPER=4
-    FLIT_WRITE_DATA_LOWER=5
-    FLIT_RESET=6
-
-    RESPONSE_CMD_OK = 0
-    RESPONSE_READY = 3
-    RESPONSE_NOT_READY = 0xFF
+class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
 
     class LED_COLOR(Enum):
         BLUE = 1
@@ -43,11 +28,9 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
 
     def __init__(self):
         super().__init__()
-        self.bytecount_size = 0 # avoid address increment in base class implementation
-        self.memmap = None
-        self.timeout = 1
         self.last_key = bytes()
         self.key = bytes()
+        self._input_clock = 100E6
 
     def _con(self, scope=None, **kwargs):
         """Connect to the target FPGA
@@ -82,172 +65,26 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
             kwargs.pop("hwh_file")
 
         if hwh_path.exists():
-            self.memmap = vivado_parse_memmap(str(hwh_path), "/usb_interface_0")
+            self.memmap = str(hwh_path), "/usb_interface_0"
 
         super()._con(**kwargs)
 
-    def reset_interface(self):
-        """Force reset the stuck state of the interface module"""
-        _ = super().fpga_read(0xFFFF, 1)
 
     def setup(self):
-        """Default setup for CW305Shell
-
-            The template design assumes that onboard PLL generates 100MHz clock.
-            If you change the input clock frequency to the PLL IP (Clocking Wizard IP in Vivado), you need to change the PLL settings.
-
+        """
+            Default setup for CW305Shell. Mostly, this function sets up the on-board PLL.
+            Especially, PLL_CLK1 is used as a clock source for generating the system clock in the FPGA.
+            The actual input clock frequency is obtained from the hwh file if it is specified, otherwise the default value of 100MHz is used.
         """
         self.pll.pll_enable_set(True)
         self.pll.pll_outenable_set(False, 0)
         self.pll.pll_outenable_set(True, 1)
         self.pll.pll_outenable_set(False, 2)
-        self.pll.pll_outfreq_set(100E6, 1)
+
+        self.pll.pll_outfreq_set(self._input_clock, 1)
+
         self.reset()
 
-    def __make_flit(self, type, payload, data_len = 0):
-        """Helper function to make flit"""
-        # payload is 16-bit
-        if payload > 0xffff:
-            raise ValueError("payload is too large")
-        flit = payload
-        flit |= (data_len << 16)
-        flit |= (type << 20)
-        # calculate even parity
-        parity = 0
-        for i in range(24):
-            parity ^= (flit >> i) & 1
-        flit |= (parity << 24)
-        return flit
-
-    def __wait_until_not_ready(self):
-        """Wait until the FPGA responds some value other than NOT_READY"""
-        deadline = time.monotonic() + self.timeout
-        while time.monotonic() < deadline:
-            resp = super().fpga_read(0x0, 1)[0]
-            if resp != CW305ShellBase.RESPONSE_NOT_READY:
-                return resp
-            time.sleep(0.01)
-
-        return -1 # timeout
-
-
-    def fpga_write(self, addr, data):
-        """Write data to FPGA based on the shell communication protocol
-
-            Args:
-                addr (int): address to write data
-                data (int or list of int): data to write
-                In the case of a list, the data length must be less than or equal to 16.
-
-            Note:
-                All data is written as 32-bit data.
-                If multiple data are written, the address is incremented by 4 for each data.
-
-            Raises:
-                ValueError: if data length is greater than 16
-                RuntimeError: if the shell interface does not respond correctly
-
-        """
-        # check if data is iterable
-        if not hasattr(data, "__iter__"):
-            data = [data]
-        if len(data) > 16:
-            raise ValueError("data is too large")
-
-        addr_upper = addr >> 16
-        addr_lower = addr & 0xffff
-        flits = []
-        flits.append(self.__make_flit(CW305ShellBase.FLIT_WRITE_ADDR_UPPER, addr_upper, len(data)-1))
-        flits.append(self.__make_flit(CW305ShellBase.FLIT_WRITE_ADDR_LOWER, addr_lower))
-        for d in data:
-            data_upper = d >> 16
-            if data_upper > 0xffff:
-                Warning("sending data exceeding 32-bit limit. It will be truncated")
-            data_lower = d & 0xffff
-            flits.append(self.__make_flit(CW305ShellBase.FLIT_WRITE_DATA_UPPER, data_upper))
-            flits.append(self.__make_flit(CW305ShellBase.FLIT_WRITE_DATA_LOWER, data_lower))
-        for flit in flits:
-            addr = flit >> 8
-            binary = flit & 0xff
-            super().fpga_write(addr, [binary])
-
-        resp = self.__wait_until_not_ready()
-        if resp != CW305ShellBase.RESPONSE_CMD_OK:
-            if resp < 0:
-                msg = f"FPGA write timed out"
-            else:
-                msg = f"FPGA write got unexpected response 0x{resp:02x}"
-            self.reset_interface()
-            raise RuntimeError(msg)
-
-    def fpga_read(self, addr, data_len):
-        """Read data from FPGA based on the shell communication protocol
-
-            Args:
-                addr (int): address to read data
-                data_len (int): number of 32-bit data to read
-                The data length must be less than or equal to 16.
-
-            Returns:
-                numpy array (data type = numpy.uint32)
-
-            Raises:
-                ValueError: if data length is greater than 16
-                RuntimeError: if the shell interface does not respond correctly
-
-        """
-
-        if data_len > 16 or data_len < 0:
-            raise ValueError("data_len must be between 1 and 16")
-        addr_upper = addr >> 16
-        addr_lower = addr & 0xffff
-        flits = []
-        flits.append(self.__make_flit(CW305ShellBase.FLIT_READ_ADDR_UPPER, addr_upper, data_len-1))
-        flits.append(self.__make_flit(CW305ShellBase.FLIT_READ_ADDR_LOWER, addr_lower))
-        for flit in flits:
-            addr = flit >> 8
-            data = flit & 0xff
-            super().fpga_write(addr, [data])
-        resp = self.__wait_until_not_ready()
-        if resp != CW305ShellBase.RESPONSE_READY:
-            if resp < 0:
-                msg = f"FPGA read timed out"
-            else:
-                msg = f"FPGA read got unexpected response 0x{resp:02x}"
-            self.reset_interface()
-            raise RuntimeError(msg)
-
-        # get data
-        binary_data = super().fpga_read(0x0, data_len*4)
-        # decode as little endian
-        data = np.frombuffer(binary_data, "<u4")
-        resp = super().fpga_read(0x0, 1)[0]
-        if resp != CW305ShellBase.RESPONSE_CMD_OK:
-            self.reset_interface()
-            raise RuntimeError(f"unexpected response 0x{resp:02x}", data)
-
-        return data
-
-    def soft_reset(self):
-        """Soft reset the FPGA
-
-            This function sends a reset command to the FPGA.
-            Then, the interface module resets the other modules in the FPGA.
-            To reset the stuck state of the interface module, call reset_interface() instead.
-
-        """
-        reset_cmd_flit = self.__make_flit(CW305ShellBase.FLIT_RESET, 0)
-        addr = reset_cmd_flit >> 8
-        data = reset_cmd_flit & 0xff
-        super().fpga_write(addr, [data])
-        resp = self.__wait_until_not_ready()
-        if resp != CW305ShellBase.RESPONSE_CMD_OK:
-            if resp < 0:
-                msg = f"Soft reset timed out"
-            else:
-                msg = f"Soft reset got unexpected response 0x{resp:02x}"
-            self.reset_interface()
-            raise RuntimeError(msg)
 
     def fpga_led_on(self, led):
         """Turn on onbaord LEDs
@@ -267,9 +104,12 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
         """
 
         if self.memmap is None:
-            raise RuntimeError("No memory map is not available. Load .hwh when connecting to the target")
+            raise RuntimeError("No memory map is available. Load .hwh when connecting to the target")
 
-        current_leds = self.fpga_read(self.memmap.axi_gpio.base + 8, 1) # see AMD DS744 datasheet
+        try:
+            current_leds = self.fpga_read(self.memmap.axi_usr_dip_led.base + 8, 1) # see AMD DS744 datasheet
+        except AttributeError:
+            raise RuntimeError("AXI GPIO module for LED control is not found in the configured FPGA design. Please check the .hwh file and the design.")
 
         if isinstance(led, CW305ShellBase.LED_COLOR):
             led = led.value
@@ -277,7 +117,7 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
             raise ValueError("LED number must be between 0 and 2")
 
         next_leds = current_leds | (1 << led)
-        self.fpga_write(self.memmap.axi_gpio.base + 8, next_leds)
+        self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
 
     def fpga_led_off(self, led):
         """Turn off onbaord LEDs
@@ -287,7 +127,11 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
         if self.memmap is None:
             raise RuntimeError("No memory map is not available. Load .hwh when connecting to the target")
 
-        current_leds = self.fpga_read(self.memmap.axi_gpio.base + 8, 1)
+        try:
+            current_leds = self.fpga_read(self.memmap.axi_usr_dip_led.base + 8, 1)
+        except AttributeError:
+            raise RuntimeError("AXI GPIO module for LED control is not found in the configured FPGA design. Please check the .hwh file and the design.")
+    
         if isinstance(led, CW305ShellBase.LED_COLOR):
             led = led.value
         if led > 2 or led < 0:
@@ -295,7 +139,7 @@ class CW305ShellBase(CW305, metaclass=ABCMeta):
 
         next_leds = current_leds & ~(1 << led)
 
-        self.fpga_write(self.memmap.axi_gpio.base + 8, next_leds)
+        self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
 
     def reset(self):
         self.reset_interface()

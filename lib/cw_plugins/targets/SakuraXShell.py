@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  27-03-2024 18:15:49
-#   Last Modified: 22-10-2026 16:43:56
+#   Last Modified: 09-11-2026 21:07:07
 ###
 
 
@@ -176,7 +176,8 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
         """
 
          # check if hwh file exists in the same directory as bitstream
-        if "hwh_file" in kwargs:
+        if "hwh_file" in kwargs and kwargs["hwh_file"] is not None:
+            print(kwargs["hwh_file"])
             hwh_path = Path(kwargs["hwh_file"])
             if hwh_path.exists():
                 self.memmap = str(hwh_path), "/controller_AXI_0"
@@ -361,6 +362,52 @@ class SakuraXShellBase(TargetTemplate, metaclass=ABCMeta):
     def flush(self):
         self.ser.flush()
         self.ser.reset_output_buffer()
+
+    def fpga_led_on(self, led):
+        """Turn on onbaord LEDs
+
+            Args:
+                led (int): LED number to turn on (0 to 9)
+
+            Note:
+                This function does not change the state of other LEDs.
+                This function needs hardware handoff file (.hwh) to be loaded.
+        """
+
+        if self.memmap is None:
+            raise RuntimeError("No memory map is available. Load .hwh when connecting to the target")
+
+        try:
+            current_leds = self.fpga_read(self.memmap.axi_usr_dip_led.base + 8, 1) # see AMD DS744 datasheet
+        except AttributeError:
+            raise RuntimeError("AXI GPIO module for LED control is not found in the configured FPGA design. Please check the .hwh file and the design.")
+
+        if led > 9 or led < 0:
+            raise ValueError("LED number must be between 0 and 9")
+
+        next_leds = int(current_leds[0]) | (1 << led)
+        self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
+
+    def fpga_led_off(self, led):
+        """Turn off onbaord LEDs
+
+            The arguments are the same as fpga_led_on.
+        """
+        if self.memmap is None:
+            raise RuntimeError("No memory map is not available. Load .hwh when connecting to the target")
+
+        try:
+            current_leds = self.fpga_read(self.memmap.axi_usr_dip_led.base + 8, 1)
+        except AttributeError:
+            raise RuntimeError("AXI GPIO module for LED control is not found in the configured FPGA design. Please check the .hwh file and the design.")
+
+        if led > 9 or led < 0:
+            raise ValueError("LED number must be between 0 and 9")
+
+        next_leds = int(current_leds[0]) & ~(1 << led)
+
+        self.fpga_write(self.memmap.axi_usr_dip_led.base + 8, next_leds)
+
 
     ###########################################################
     #############         abstract methods        #############

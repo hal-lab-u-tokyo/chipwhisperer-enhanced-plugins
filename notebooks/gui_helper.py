@@ -399,7 +399,7 @@ def connectBoard(scope):
     elif board_type == "CW305":
         kwargs = {}
         if boardPanel.bitfile_sel.selected is not None:
-            kwargs['bs_file'] = boardPanel.bitfile_sel.selected
+            kwargs['bsfile'] = boardPanel.bitfile_sel.selected
         if boardPanel.hwhfile_sel.selected is not None:
             kwargs['hwh_file'] = boardPanel.hwhfile_sel.selected
         

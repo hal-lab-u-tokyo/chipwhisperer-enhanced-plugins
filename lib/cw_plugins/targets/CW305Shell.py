@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  18-10-2026 16:36:13
-#   Last Modified: 22-10-2026 19:30:37
+#   Last Modified: 09-11-2026 19:38:25
 ###
 
 
@@ -64,8 +64,10 @@ class CW305ShellBase(CWShellMixin,CW305, metaclass=ABCMeta):
                 bs_path = Path(self._bsfile)
                 hwh_path = bs_path.parent / (bs_path.stem + ".hwh")
         else:
-            hwh_path = Path(kwargs["hwh_file"])
+            if "hwh_file" in kwargs and kwargs["hwh_file"] is not None:
+                hwh_path = Path(kwargs["hwh_file"])
             kwargs.pop("hwh_file")
+
 
         if hwh_path is not None and hwh_path.exists():
             self.memmap = str(hwh_path), "/usb_interface_0"

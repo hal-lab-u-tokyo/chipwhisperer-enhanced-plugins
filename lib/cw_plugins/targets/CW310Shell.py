@@ -5,7 +5,7 @@
 #   Project:       chipwhisperer-enhanced-plugins
 #   Author:        Takuya Kojima in University of Tsukuba (tkojima@lila.cs.tsukuba.ac.jp)
 #   Created Date:  18-10-2026 17:06:46
-#   Last Modified: 22-10-2026 19:30:24
+#   Last Modified: 09-11-2026 19:38:36
 ###
 
 
@@ -56,7 +56,8 @@ class CW310ShellBase(CWShellMixin,CW310, metaclass=ABCMeta):
                 bs_path = Path(self._bsfile)
                 hwh_path = bs_path.parent / (bs_path.stem + ".hwh")
         else:
-            hwh_path = Path(kwargs["hwh_file"])
+            if "hwh_file" in kwargs and kwargs["hwh_file"] is not None:
+                hwh_path = Path(kwargs["hwh_file"])
             kwargs.pop("hwh_file")
 
         if hwh_path is not None and hwh_path.exists():
